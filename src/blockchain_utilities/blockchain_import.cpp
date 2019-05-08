@@ -501,18 +501,43 @@ int import_from_file(cryptonote::core& core, const std::string& import_file_path
           cumulative_difficulty = bp.cumulative_difficulty;
           coins_generated = bp.coins_generated;
 
-          try
-          {
-            uint64_t long_term_block_weight = core.get_blockchain_storage().get_next_long_term_block_weight(block_weight);
-            core.get_blockchain_storage().get_db().add_block(b, block_weight, long_term_block_weight, cumulative_difficulty, coins_generated, txs);
-          }
-          catch (const std::exception& e)
-          {
-            std::cout << refresh_string;
-            MFATAL("Error adding block to blockchain: " << e.what());
-            quit = 2; // make sure we don't commit partial block data
-            break;
-          }
+try
+{
+  uint64_t long_term_block_weight =
+      core.get_blockchain_storage().get_next_long_term_block_weight(block_weight);
+
+  // Serialize the block
+  cryptonote::blobdata bd = cryptonote::block_to_blob(b);
+
+  // Convert txs -> vector<pair<transaction, blobdata>>
+  std::vector<std::pair<cryptonote::transaction, cryptonote::blobdata>> txs_with_blobs;
+  txs_with_blobs.reserve(txs.size());
+
+  for (const auto &tx : txs)
+  {
+    cryptonote::blobdata tx_blob;
+    cryptonote::t_serializable_object_to_blob(tx, tx_blob);
+    txs_with_blobs.emplace_back(tx, std::move(tx_blob));
+  }
+
+  // Now call the correct overload
+  core.get_blockchain_storage().get_db().add_block(
+      std::make_pair(b, std::move(bd)),
+      block_weight,
+      long_term_block_weight,
+      cumulative_difficulty,
+      coins_generated,
+      txs_with_blobs
+  );
+}
+catch (const std::exception &e)
+{
+  std::cout << refresh_string;
+  MFATAL("Error adding block to blockchain: " << e.what());
+  quit = 2; // make sure we don't commit partial block data
+  break;
+}
+
 
           if (use_batch)
           {

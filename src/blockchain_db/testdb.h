@@ -63,6 +63,7 @@ public:
   virtual void unlock() override { }
   virtual bool batch_start(uint64_t batch_num_blocks, uint64_t batch_bytes) override { return true; }
   virtual void batch_stop() override {}
+  virtual void batch_abort() override {}
   virtual void set_batch_transactions(bool) override {}
   virtual void block_txn_start(bool readonly=false) override {}
   virtual void block_txn_stop() override {}
@@ -130,6 +131,7 @@ public:
   virtual bool for_all_outputs(std::function<bool(uint64_t amount, const crypto::hash &tx_hash, uint64_t height, size_t tx_idx)> f) const override { return true; }
   virtual bool for_all_outputs(uint64_t amount, const std::function<bool(uint64_t height)> &f) const override { return true; }
 
+<<<<<<< HEAD
   virtual void set_hard_fork_version(uint64_t height, uint8_t version) override {}
   virtual uint8_t get_hard_fork_version(uint64_t height) const override { return 0; }
   virtual void check_hard_fork_info() override {}
@@ -148,6 +150,15 @@ public:
 
   virtual cryptonote::transaction get_pruned_tx(const crypto::hash& h) const override { return {}; };
   virtual bool get_tx(const crypto::hash& h, cryptonote::transaction &tx) const override { return false; }
+  virtual uint64_t get_max_block_size() override { return 100000000; }
+  virtual void add_max_block_size(uint64_t sz) override { }
+
+  virtual void add_alt_block(const crypto::hash &blkid, const cryptonote::alt_block_data_t &data, const cryptonote::blobdata &blob) override {}
+  virtual bool get_alt_block(const crypto::hash &blkid, alt_block_data_t *data, cryptonote::blobdata *blob) override { return false; }
+  virtual void remove_alt_block(const crypto::hash &blkid) override {}
+  virtual uint64_t get_alt_block_count() override { return 0; }
+  virtual void drop_alt_blocks() override {}
+  virtual bool for_all_alt_blocks(std::function<bool(const crypto::hash &blkid, const alt_block_data_t &data, const cryptonote::blobdata *blob)> f, bool include_blob = false) const override { return true; }
 };
 
 }

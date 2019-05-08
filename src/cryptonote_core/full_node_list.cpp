@@ -1593,10 +1593,9 @@ namespace full_nodes
     CHECK_AND_ASSERT_MES(r, false, "Failed to store fullnode info: failed to serialize data");
 
     std::string blob = ss.str();
-    m_db->block_txn_start(false/*readonly*/);
+   cryptonote::db_txn_guard txn_guard(m_db, /*readonly=*/false);
     m_db->set_full_node_data(blob);
-    m_db->block_txn_stop();
-
+   txn_guard.stop();
     return true;
   }
 
@@ -1636,13 +1635,11 @@ namespace full_nodes
     data_members_for_serialization data_in;
     std::string blob;
 
-    m_db->block_txn_start(true/*readonly*/);
+    cryptonote::db_txn_guard txn_guard(m_db, /*readonly=*/true);
     if (!m_db->get_full_node_data(blob))
     {
-      m_db->block_txn_stop();
       return false;
     }
-    m_db->block_txn_stop();
 
     ss << blob;
     binary_archive<false> ba(ss);
@@ -1718,9 +1715,8 @@ namespace full_nodes
     m_transient_state = {};
     if (m_db && delete_db_entry)
     {
-      m_db->block_txn_start(false/*readonly*/);
+      cryptonote::db_txn_guard txn_guard(m_db, /*readonly=*/false);
       m_db->clear_full_node_data();
-      m_db->block_txn_stop();
     }
 
     uint64_t hardfork_9_from_height = 0;

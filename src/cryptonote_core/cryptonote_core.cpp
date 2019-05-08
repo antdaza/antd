@@ -349,7 +349,6 @@ namespace cryptonote
     command_line::add_arg(desc, arg_reorg_notify);
     command_line::add_arg(desc, arg_block_rate_notify);
     command_line::add_arg(desc, arg_keep_alt_blocks);
-
     command_line::add_arg(desc, arg_recalculate_difficulty);
 #if defined(ANTD_ENABLE_INTEGRATION_TEST_HOOKS)
     command_line::add_arg(desc, antd::arg_integration_test_hardforks_override);
@@ -525,7 +524,6 @@ namespace cryptonote
     size_t max_txpool_weight = command_line::get_arg(vm, arg_max_txpool_weight);
     bool prune_blockchain = command_line::get_arg(vm, arg_prune_blockchain);
     bool keep_alt_blocks = command_line::get_arg(vm, arg_keep_alt_blocks);
-
     if (m_full_node)
     {
       r = init_full_node_key();

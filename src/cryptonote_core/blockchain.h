@@ -92,7 +92,6 @@ namespace cryptonote
   class Blockchain
   {
   public:
-
     /**
      * @brief container for passing a block and metadata about it on the blockchain
      */
@@ -1236,8 +1235,8 @@ namespace cryptonote
      *
      * @return false if the reorganization fails, otherwise true
      */
-//    bool switch_to_alternative_blockchain(std::list<blocks_ext_by_hash::iterator>& alt_chain, bool discard_disconnected_chain);
-        bool switch_to_alternative_blockchain(std::list<block_extended_info>& alt_chain, bool discard_disconnected_chain);
+    bool switch_to_alternative_blockchain(std::list<block_extended_info>& alt_chain, bool discard_disconnected_chain);
+
     /**
      * @brief removes the most recent block from the blockchain
      *

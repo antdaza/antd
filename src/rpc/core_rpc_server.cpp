@@ -2604,7 +2604,7 @@ std::string print_transaction_as_json_safe(const pruned_transaction& ptx) {
       args.push_back(std::to_string(portions_cut));
     }
 
-    for (const auto contrib : req.contributions)
+    for (const auto &contrib : req.contributions)
     {
         uint64_t num_portions = full_nodes::get_portions_to_make_amount(staking_requirement, contrib.amount);
         args.push_back(contrib.address);
