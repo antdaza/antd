@@ -69,7 +69,6 @@ set(crypto_private_headers
   oaes_lib.h
   random.h
   skein.h
-  rx-slow-hash.h
   skein_port.h)
 
 antd_private_headers(cncrypto

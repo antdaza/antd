@@ -1714,34 +1714,40 @@ bool Blockchain::handle_alternative_block(const block& b, const crypto::hash& id
     difficulty_type current_diff = get_next_difficulty_for_alternative_chain(alt_chain, bei);
     CHECK_AND_ASSERT_MES(current_diff, false, "!!!!!!! DIFFICULTY OVERHEAD !!!!!!!");
     crypto::hash proof_of_work = null_hash;
-    if (b.major_version >= RX_BLOCK_VERSION)
+if (b.major_version >= RX_BLOCK_VERSION)
+{
+  crypto::hash seedhash = null_hash;
+  uint64_t seedheight = rx_seedheight(bei.height);
+
+  // seedblock is on the alt chain somewhere
+if (!alt_chain.empty() && (*alt_chain.front()).second.height <= seedheight)
+{
+  for (auto it = alt_chain.begin(); it != alt_chain.end(); ++it)
+  {
+    if ((*it)->second.height == seedheight + 1)
     {
-      crypto::hash seedhash = null_hash;
-      uint64_t seedheight = rx_seedheight(bei.height);
-      // seedblock is on the alt chain somewhere
-      if (alt_chain.size() && alt_chain.front().height <= seedheight)
-      {
-        for (auto it=alt_chain.begin(); it != alt_chain.end(); it++)
-        {
-          if (it->height == seedheight+1)
-          {
-            seedhash = it->bl.prev_id;
-            break;
-          }
-        }
-      } else
-      {
-        seedhash = get_block_id_by_height(seedheight);
-      }
-      get_altblock_longhash(bei.bl, proof_of_work, get_current_blockchain_height(), bei.height, seedheight, seedhash);
-    } else
-    {
-      get_block_longhash(this, bei.bl, proof_of_work, bei.height, 0);
+      seedhash = (*it)->second.bl.prev_id;
+      break;
     }
+  }
+}
+  else
+  {
+    seedhash = get_block_id_by_height(seedheight);
+  }
+
+  get_altblock_longhash(bei.bl, proof_of_work, get_current_blockchain_height(), bei.height, seedheight, seedhash);
+}
+else
+{
+  get_block_longhash(this, bei.bl, proof_of_work, bei.height, 0);
+}
+
     if(!check_hash(proof_of_work, current_diff))
     {
       MERROR_VER("Block with id: " << id << std::endl << " for alternative chain, does not have enough proof of work: " << proof_of_work << std::endl << " expected difficulty: " << current_diff);
       bvc.m_verifivation_failed = true;
+      bvc.m_bad_pow = true;
       return false;
     }
 
@@ -3568,7 +3574,8 @@ bool Blockchain::handle_block_to_main_chain(const block& bl, const crypto::hash&
   TIME_MEASURE_START(t1);
 
   static bool seen_future_version = false;
-
+  uint64_t blockchain_height;
+  ++blockchain_height; // block height to chain height
   m_db->block_txn_start(true);
   if(bl.prev_id != get_tail_id())
   {
@@ -3677,6 +3684,7 @@ leave:
     {
       MERROR_VER("Block with id: " << id << std::endl << "does not have enough proof of work: " << proof_of_work << std::endl << "unexpected difficulty: " << current_diffic);
       bvc.m_verifivation_failed = true;
+      bvc.m_bad_pow = true;
       goto leave;
     }
   }
