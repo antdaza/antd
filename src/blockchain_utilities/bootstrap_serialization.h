@@ -66,7 +66,7 @@ namespace cryptonote
       END_SERIALIZE()
     };
 
-/*    struct block_package
+    struct block_package
     {
       cryptonote::block block;
       std::vector<transaction> txs;
@@ -74,7 +74,7 @@ namespace cryptonote
       difficulty_type cumulative_difficulty;
       uint64_t coins_generated;
 
-     BEGIN_SERIALIZE()
+      BEGIN_SERIALIZE()
         FIELD(block)
         FIELD(txs)
         VARINT_FIELD(block_weight)
@@ -82,7 +82,7 @@ namespace cryptonote
         VARINT_FIELD(coins_generated)
       END_SERIALIZE()
     };
-*/
+
     struct block_package_1
     {
       cryptonote::block block;
@@ -100,32 +100,6 @@ namespace cryptonote
       END_SERIALIZE()
     };
 
-struct block_package
-{
-    cryptonote::block block;
-    std::vector<transaction> txs;
-    size_t block_weight;
-   // std::string cumulative_difficulty_str; // Store as string
-    difficulty_type cumulative_difficulty;
-    uint64_t coins_generated;
-
-    BEGIN_SERIALIZE()
-        FIELD(block)
-        FIELD(txs)
-        VARINT_FIELD(block_weight)
-        FIELD(cumulative_difficulty)
-//        FIELD(cumulative_difficulty_str) // Serialize as string
-        VARINT_FIELD(coins_generated)
-    END_SERIALIZE()
-
-    // Helper methods to convert between difficulty_type and string
-    void set_cumulative_difficulty(const difficulty_type &diff) {
-        cumulative_difficulty_str = diff.str();
-    }
-    difficulty_type get_cumulative_difficulty() const {
-        return difficulty_type(cumulative_difficulty_str);
-    }
-};
   }
 
 }

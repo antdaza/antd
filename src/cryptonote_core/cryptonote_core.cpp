@@ -49,6 +49,7 @@ using namespace epee;
 #include "misc_language.h"
 #include "file_io_utils.h"
 #include <csignal>
+#include "constants.h"
 #include "checkpoints/checkpoints.h"
 #include "ringct/rctTypes.h"
 #include "hardforks/hardforks.h"
@@ -228,7 +229,7 @@ namespace cryptonote
               m_full_node_list(m_blockchain_storage),
               m_blockchain_storage(m_mempool, m_full_node_list, m_deregister_vote_pool),
               m_quorum_cop(*this),
-              m_miner(this),
+              m_miner(this, &m_blockchain_storage),
               m_miner_address(boost::value_initialized<account_public_address>()),
               m_starter_message_showed(false),
               m_target_blockchain_height(0),
@@ -730,6 +731,8 @@ namespace cryptonote
     CHECK_AND_ASSERT_MES(r, false, "Failed to initialize blockchain storage");
 
     block_sync_size = command_line::get_arg(vm, arg_block_sync_size);
+    if (block_sync_size > BLOCKS_SYNCHRONIZING_MAX_COUNT)
+      MERROR("Error --block-sync-size cannot be greater than " << BLOCKS_SYNCHRONIZING_MAX_COUNT);
 
     MGINFO("Loading checkpoints");
 

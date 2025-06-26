@@ -37,6 +37,7 @@ using namespace epee;
 #include "common/apply_permutation.h"
 #include "cryptonote_tx_utils.h"
 #include "cryptonote_config.h"
+#include "blockchain.h"
 #include "cryptonote_basic/miner.h"
 #include "cryptonote_basic/tx_extra.h"
 #include "crypto/crypto.h"
@@ -179,7 +180,7 @@ namespace cryptonote
     }
 
     static_assert(FULL_NODE_BASE_REWARD_DIVISOR == 2 &&
-                  CONTROL_BASE_REWARD_DIVISOR == 20,
+                  CONTROL_BASE_REWARD_DIVISOR == 6,
                   "Anytime this changes, you should revisit this code and "
                   "check, because we rely on the fullnode reward being 50\% "
                   "of the base reward, and does not receive any fees. This isn't "
@@ -1004,9 +1005,53 @@ namespace cryptonote
     bl.minor_version = 7;
     bl.timestamp = 0;
     bl.nonce = nonce;
-    miner::find_nonce_for_given_block(bl, 1, 0);
+    miner::find_nonce_for_given_block(NULL, bl, 1, 0);
     bl.invalidate_hashes();
     return true;
   }
   //---------------------------------------------------------------
+  void get_altblock_longhash(const block& b, crypto::hash& res, const uint64_t main_height, const uint64_t height, const uint64_t seed_height, const crypto::hash& seed_hash)
+  {
+    blobdata bd = get_block_hashing_blob(b);
+    rx_slow_hash(main_height, seed_height, seed_hash.data, bd.data(), bd.size(), res.data, 0, 1);
+  }
+
+  bool get_block_longhash(const Blockchain *pbc, const block& b, crypto::hash& res, const uint64_t height, const int miners)
+  {
+    blobdata bd = get_block_hashing_blob(b);
+    if (b.major_version >= RX_BLOCK_VERSION)
+    {
+      uint64_t seed_height, main_height;
+      crypto::hash hash;
+      if (pbc != NULL)
+      {
+        seed_height = rx_seedheight(height);
+        hash = pbc->get_pending_block_id_by_height(seed_height);
+        main_height = pbc->get_current_blockchain_height();
+      } else
+      {
+        memset(&hash, 0, sizeof(hash));  // only happens when generating genesis block
+        seed_height = 0;
+        main_height = 0;
+      }
+      rx_slow_hash(main_height, seed_height, hash.data, bd.data(), bd.size(), res.data, miners, 0);
+    } else {
+      const int pow_variant = b.major_version >= 7 ? b.major_version - 6 : 0;
+      crypto::cn_slow_hash(bd.data(), bd.size(), res, pow_variant, height);
+    }
+    return true;
+  }
+
+  crypto::hash get_block_longhash(const Blockchain *pbc, const block& b, const uint64_t height, const int miners)
+  {
+    crypto::hash p = crypto::null_hash;
+    get_block_longhash(pbc, b, p, height, miners);
+    return p;
+  }
+
+  void get_block_longhash_reorg(const uint64_t split_height)
+  {
+    rx_reorg(split_height);
+  }
+
 }

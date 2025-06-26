@@ -190,7 +190,6 @@ namespace rpc
     crypto::hash top_block_hash;
     cryptonote::difficulty_type wide_cumulative_difficulty;
     cryptonote::difficulty_type wide_difficulty;
-    uint64_t difficulty;
     uint64_t block_size_limit;
     uint64_t block_weight_limit;
     uint64_t block_size_median;

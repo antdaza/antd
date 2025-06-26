@@ -66,3 +66,4 @@ endif()
 
 add_subdirectory(db_drivers)
 add_subdirectory(easylogging++)
+add_subdirectory(randomx EXCLUDE_FROM_ALL)

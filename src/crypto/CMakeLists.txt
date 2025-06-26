@@ -45,7 +45,10 @@ set(crypto_sources
   random.c
   skein.c
   slow-hash.c
+  rx-slow-hash.c
   tree-hash.c)
+
+include_directories(${RANDOMX_INCLUDE})
 
 set(crypto_headers)
 
@@ -66,6 +69,7 @@ set(crypto_private_headers
   oaes_lib.h
   random.h
   skein.h
+  rx-slow-hash.h
   skein_port.h)
 
 antd_private_headers(cncrypto
@@ -77,6 +81,7 @@ antd_add_library(cncrypto
 target_link_libraries(cncrypto
   PUBLIC
     epee
+    randomx
     ${Boost_SYSTEM_LIBRARY}
     ${SODIUM_LIBRARY}
   PRIVATE

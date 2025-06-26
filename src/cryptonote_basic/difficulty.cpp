@@ -121,10 +121,10 @@ namespace cryptonote {
 
   uint64_t next_difficulty_64(std::vector<std::uint64_t> timestamps, std::vector<uint64_t> cumulative_difficulties, size_t target_seconds) {
 
-    if(timestamps.size() > DIFFICULTY_WINDOW)
+    if(timestamps.size() > DIFFICULTY_WINDOW_V2)
     {
-      timestamps.resize(DIFFICULTY_WINDOW);
-      cumulative_difficulties.resize(DIFFICULTY_WINDOW);
+      timestamps.resize(DIFFICULTY_WINDOW_V2);
+      cumulative_difficulties.resize(DIFFICULTY_WINDOW_V2);
     }
 
 
@@ -133,17 +133,17 @@ namespace cryptonote {
     if (length <= 1) {
       return 1;
     }
-    static_assert(DIFFICULTY_WINDOW >= 2, "Window is too small");
-    assert(length <= DIFFICULTY_WINDOW);
+    static_assert(DIFFICULTY_WINDOW_V2 >= 2, "Window is too small");
+    assert(length <= DIFFICULTY_WINDOW_V2);
     sort(timestamps.begin(), timestamps.end());
     size_t cut_begin, cut_end;
-    static_assert(2 * DIFFICULTY_CUT <= DIFFICULTY_WINDOW - 2, "Cut length is too large");
-    if (length <= DIFFICULTY_WINDOW - 2 * DIFFICULTY_CUT) {
+    static_assert(2 * DIFFICULTY_CUT <= DIFFICULTY_WINDOW_V2 - 2, "Cut length is too large");
+    if (length <= DIFFICULTY_WINDOW_V2 - 2 * DIFFICULTY_CUT) {
       cut_begin = 0;
       cut_end = length;
     } else {
-      cut_begin = (length - (DIFFICULTY_WINDOW - 2 * DIFFICULTY_CUT) + 1) / 2;
-      cut_end = cut_begin + (DIFFICULTY_WINDOW - 2 * DIFFICULTY_CUT);
+      cut_begin = (length - (DIFFICULTY_WINDOW_V2 - 2 * DIFFICULTY_CUT) + 1) / 2;
+      cut_end = cut_begin + (DIFFICULTY_WINDOW_V2 - 2 * DIFFICULTY_CUT);
     }
     assert(/*cut_begin >= 0 &&*/ cut_begin + 2 <= cut_end && cut_end <= length);
     uint64_t time_span = timestamps[cut_end - 1] - timestamps[cut_begin];
@@ -202,10 +202,10 @@ namespace cryptonote {
 
   difficulty_type next_difficulty(std::vector<uint64_t> timestamps, std::vector<difficulty_type> cumulative_difficulties, size_t target_seconds) {
     //cutoff DIFFICULTY_LAG
-    if(timestamps.size() > DIFFICULTY_WINDOW)
+    if(timestamps.size() > DIFFICULTY_WINDOW_V2)
     {
-      timestamps.resize(DIFFICULTY_WINDOW);
-      cumulative_difficulties.resize(DIFFICULTY_WINDOW);
+      timestamps.resize(DIFFICULTY_WINDOW_V2);
+      cumulative_difficulties.resize(DIFFICULTY_WINDOW_V2);
     }
 
 
@@ -214,17 +214,17 @@ namespace cryptonote {
     if (length <= 1) {
       return 1;
     }
-    static_assert(DIFFICULTY_WINDOW >= 2, "Window is too small");
-    assert(length <= DIFFICULTY_WINDOW);
+    static_assert(DIFFICULTY_WINDOW_V2 >= 2, "Window is too small");
+    assert(length <= DIFFICULTY_WINDOW_V2);
     sort(timestamps.begin(), timestamps.end());
     size_t cut_begin, cut_end;
-    static_assert(2 * DIFFICULTY_CUT <= DIFFICULTY_WINDOW - 2, "Cut length is too large");
-    if (length <= DIFFICULTY_WINDOW - 2 * DIFFICULTY_CUT) {
+    static_assert(2 * DIFFICULTY_CUT <= DIFFICULTY_WINDOW_V2 - 2, "Cut length is too large");
+    if (length <= DIFFICULTY_WINDOW_V2 - 2 * DIFFICULTY_CUT) {
       cut_begin = 0;
       cut_end = length;
     } else {
-      cut_begin = (length - (DIFFICULTY_WINDOW - 2 * DIFFICULTY_CUT) + 1) / 2;
-      cut_end = cut_begin + (DIFFICULTY_WINDOW - 2 * DIFFICULTY_CUT);
+      cut_begin = (length - (DIFFICULTY_WINDOW_V2 - 2 * DIFFICULTY_CUT) + 1) / 2;
+      cut_end = cut_begin + (DIFFICULTY_WINDOW_V2 - 2 * DIFFICULTY_CUT);
     }
     assert(/*cut_begin >= 0 &&*/ cut_begin + 2 <= cut_end && cut_end <= length);
     uint64_t time_span = timestamps[cut_end - 1] - timestamps[cut_begin];
