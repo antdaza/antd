@@ -1,0 +1,33 @@
+--- a/dnssec_sign.c
++++ b/dnssec_sign.c
+@@ -532,7 +532,11 @@
+     if (!key) {
+         return NULL;
+     }
+-    if (EVP_PKEY_type(key->type) == EVP_PKEY_DSA) {
++    int pkey_type = EVP_PKEY_base_id(key);
++    if (pkey_type == EVP_PKEY_DSA) {
+         return ldns_sign_public_dsa(data, key);
+     } else {
+         return ldns_sign_public_rsa(data, key);
+     }
+
+@@ -417,9 +417,11 @@
+ bool ldns_pkey_is_ecdsa(ldns_key *k) {
+        EVP_PKEY *pkey;
+        EC_KEY *ec;
+        const EC_GROUP *g;
+-       if (!k || !k->_key) return false;
+-       pkey = (EVP_PKEY *)k->_key;
+-       if(EVP_PKEY_type(key->type) != EVP_PKEY_EC)
++       if (!k || !k->_key) return false;
++       pkey = (EVP_PKEY *)k->_key;
++       if(EVP_PKEY_base_id(pkey) != EVP_PKEY_EC)
+                return false;
+-       ec = EVP_PKEY_get1_EC_KEY(pkey);
++       ec = EVP_PKEY_get0_EC_KEY(pkey); /* no ref count increase */
+        if (!ec) return false;
+        g = EC_KEY_get0_group(ec);
+        if (!g) return false;
+        return true;
+}
