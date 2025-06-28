@@ -1947,7 +1947,7 @@ bool t_rpc_command_executor::print_blockchain_dynamic_stats(uint64_t nblocks)
       }
     }
 
-    double avgdiff = 0;
+    cryptonote::difficulty_type avgdiff = 0;
     double avgnumtxes = 0;
     double avgreward = 0;
     std::vector<uint64_t> weights;
@@ -1958,7 +1958,7 @@ bool t_rpc_command_executor::print_blockchain_dynamic_stats(uint64_t nblocks)
     {
       //avgdiff += bhr.difficulty.convert_to<double>();
       //avgdiff += bhr.difficulty;
-      avgdiff += std::stod(bhr.difficulty);
+      avgdiff += cryptonote::difficulty_type(bhr.wide_difficulty);
       avgnumtxes += bhr.num_txes;
       avgreward += bhr.reward;
       weights.push_back(bhr.block_weight);

@@ -498,7 +498,7 @@ int import_from_file(cryptonote::core& core, const std::string& import_file_path
           uint64_t coins_generated;
 
           block_weight = bp.block_weight;
-          cumulative_difficulty.str() = bp.cumulative_difficulty_str;
+          cumulative_difficulty = bp.cumulative_difficulty;
           coins_generated = bp.coins_generated;
 
           try

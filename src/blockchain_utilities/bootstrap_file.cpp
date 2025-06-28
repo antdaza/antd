@@ -242,7 +242,7 @@ void BootstrapFile::write_block(block& block)
     uint64_t coins_generated = m_blockchain_storage->get_db().get_block_already_generated_coins(block_height);
 
     bp.block_weight = block_weight;
-    bp.cumulative_difficulty_str = cumulative_difficulty.str();
+    bp.cumulative_difficulty = cumulative_difficulty;
     bp.coins_generated = coins_generated;
   }
 
