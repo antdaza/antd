@@ -258,6 +258,7 @@ namespace
   const char* USAGE_REQUEST_STAKE_UNLOCK("request_stake_unlock <full_node_pubkey>");
   const char* USAGE_PRINT_LOCKED_STAKES("print_locked_stakes");
   const char* USAGE_ADD_ARTICLE("add_article <title>  <content> <pulish> 44Affq... 0.001");
+  const char* USAGE_SHOW_ARTICLES("show_articles");
 
 #if defined (ANTD_ENABLE_INTEGRATION_TEST_HOOKS)
   std::string input_line(const std::string& prompt, bool yesno = false)
@@ -2984,6 +2985,11 @@ simple_wallet::simple_wallet()
   //
   // Antd
   //
+  m_cmd_binder.set_handler("show_articles",
+                           boost::bind(&simple_wallet::show_articles, this, _1),
+                           tr(USAGE_SHOW_ARTICLES),
+                           tr("Show articles"));
+
   m_cmd_binder.set_handler("add_article",
                            boost::bind(&simple_wallet::add_article, this, _1),
                            tr(USAGE_ADD_ARTICLE),
@@ -6214,6 +6220,107 @@ bool simple_wallet::add_article(const std::vector<std::string> &args_)
   return true;
 }
 //-------------------------------------------
+static bool get_tx_extra_nonce(const std::vector<uint8_t>& extra, std::string& nonce)
+  {
+    cryptonote::tx_extra_nonce extra_nonce;
+    std::vector<cryptonote::tx_extra_field> tx_extra_fields;
+    if (!parse_tx_extra(extra, tx_extra_fields))
+      return false;
+
+    if (find_tx_extra_field_by_type(tx_extra_fields, extra_nonce))
+    {
+      nonce = extra_nonce.nonce;
+      return true;
+    }
+    return false;
+  }
+//-------------------------------------------
+static std::string get_article_metadata(const std::vector<uint8_t>& extra)
+{
+  std::string extra_nonce;
+  if (!get_tx_extra_nonce(extra, extra_nonce))
+    return {};
+
+  // Look for "ARTC" prefix in extra_nonce
+  const std::string prefix = "ARTC";
+  if (extra_nonce.size() < prefix.size())
+    return {};
+
+  if (extra_nonce.compare(0, prefix.size(), prefix) != 0)
+    return {};
+
+  // Extract the blob safely (after prefix)
+  return extra_nonce.substr(prefix.size());
+}
+//-------------------------------------------
+bool cryptonote::simple_wallet::show_articles(const std::vector<std::string>& args)
+{
+  const std::string prefix = "ARTC";
+  bool found = false;
+
+  // Helper to extract ARTC blob
+  auto get_article_metadata = [prefix](const std::vector<uint8_t>& extra) -> std::string {
+    std::string extra_nonce;
+    if (!get_tx_extra_nonce(extra, extra_nonce))
+      return {};
+
+    if (extra_nonce.size() < prefix.size())
+      return {};
+
+    if (extra_nonce.compare(0, prefix.size(), prefix) != 0)
+      return {};
+
+    return extra_nonce.substr(prefix.size()); // Skip "ARTC"
+  };
+
+  // Print a parsed article line
+  auto print_article = [](const std::string& blob, const crypto::hash& txid) {
+    std::string title, content, publisher;
+    size_t t_pos = blob.find("TITLE:");
+    size_t c_pos = blob.find(";CONTENT:");
+    size_t p_pos = blob.find(";PUBLISHER:");
+
+    if (t_pos != 0 || c_pos == std::string::npos || p_pos == std::string::npos || c_pos < 6 || p_pos < c_pos + 9)
+    {
+      message_writer() << "Malformed article in tx: " << epee::string_tools::pod_to_hex(txid);
+      return;
+    }
+
+    title = blob.substr(6, c_pos - 6);
+    content = blob.substr(c_pos + 9, p_pos - (c_pos + 9));
+    publisher = blob.substr(p_pos + 11);
+
+    message_writer() << "\nArticle from txid: " << epee::string_tools::pod_to_hex(txid);
+    message_writer() << "  Title    : " << title;
+    message_writer() << "  Content  : " << content;
+    message_writer() << "  Publisher: " << publisher;
+  };
+
+  // Scan Incoming and Outgoing Transfers
+  tools::wallet2::transfer_container transfers;
+  m_wallet->get_transfers(transfers); // Get both incoming and outgoing
+
+  for (const auto& entry : transfers)
+  {
+    const tools::wallet2::transfer_details& td = entry;
+    const cryptonote::transaction_prefix& tx = td.m_tx; // Use transaction_prefix
+
+    std::string blob = get_article_metadata(tx.extra);
+    if (!blob.empty())
+    {
+      print_article(blob, td.m_txid);
+      found = true;
+    }
+  }
+
+  if (!found)
+  {
+    message_writer() << "No articles found in wallet transfer history.";
+  }
+
+  return true;
+}
+//-------------------------------------------------------------------------
 bool simple_wallet::locked_sweep_all(const std::vector<std::string> &args_)
 {
   return sweep_main(0, true, args_);
