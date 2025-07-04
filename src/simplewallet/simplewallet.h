@@ -158,6 +158,8 @@ namespace cryptonote
     bool show_blockchain_height(const std::vector<std::string> &args);
     bool transfer_main(int transfer_type, const std::vector<std::string> &args, bool called_by_mms);
     bool transfer(const std::vector<std::string> &args);
+    bool article_main(int transfer_type, const std::vector<std::string> &args_, bool called_by_mms);
+    bool add_article(const std::vector<std::string> &args);
     bool locked_transfer(const std::vector<std::string> &args);
     bool stake(const std::vector<std::string> &args_);
     bool register_full_node(const std::vector<std::string> &args_);

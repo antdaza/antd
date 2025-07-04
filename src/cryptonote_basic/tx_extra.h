@@ -46,6 +46,7 @@
 #define TX_EXTRA_TAG_TX_SECRET_KEY            0x75
 #define TX_EXTRA_TAG_TX_KEY_IMAGE_PROOFS      0x76
 #define TX_EXTRA_TAG_TX_KEY_IMAGE_UNLOCK      0x77
+#define TX_EXTRA_TAG_ARTICLE_INFO          0x78
 #define TX_EXTRA_MYSTERIOUS_MINERGATE_TAG     0xDE
 
 #define TX_EXTRA_NONCE_PAYMENT_ID             0x00
@@ -291,6 +292,19 @@ namespace cryptonote
     END_SERIALIZE()
   };
 
+struct tx_extra_article_info
+{
+  std::string title;
+  std::string content;
+  std::string publisher;
+
+  BEGIN_SERIALIZE_OBJECT()
+    FIELD(title)
+    FIELD(content)
+    FIELD(publisher)
+  END_SERIALIZE()
+};
+
   // tx_extra_field format, except tx_extra_padding and tx_extra_pub_key:
   //   varint tag;
   //   varint size;
@@ -308,7 +322,8 @@ namespace cryptonote
                          tx_extra_full_node_deregister,
                          tx_extra_tx_secret_key,
                          tx_extra_tx_key_image_proofs,
-                         tx_extra_tx_key_image_unlock
+                         tx_extra_tx_key_image_unlock,
+                         tx_extra_article_info
                         > tx_extra_field;
 }
 
@@ -329,3 +344,4 @@ VARIANT_TAG(binary_archive, cryptonote::tx_extra_full_node_pubkey,      TX_EXTRA
 VARIANT_TAG(binary_archive, cryptonote::tx_extra_tx_secret_key,            TX_EXTRA_TAG_TX_SECRET_KEY);
 VARIANT_TAG(binary_archive, cryptonote::tx_extra_tx_key_image_proofs,      TX_EXTRA_TAG_TX_KEY_IMAGE_PROOFS);
 VARIANT_TAG(binary_archive, cryptonote::tx_extra_tx_key_image_unlock,      TX_EXTRA_TAG_TX_KEY_IMAGE_UNLOCK);
+VARIANT_TAG(binary_archive, cryptonote::tx_extra_article_info,   TX_EXTRA_TAG_ARTICLE_INFO);
