@@ -5858,30 +5858,43 @@ if (has_article_metadata) {
   size_t num_subaddresses = 0;
 
 {
+  if (local_args.size() < 2)
+  {
+    fail_msg_writer() << tr("missing recipient address and amount");
+    return false;
+  }
+
+  const std::string& address_str = local_args[local_args.size() - 2];
+  const std::string& amount_str  = local_args[local_args.size() - 1];
+
   cryptonote::address_parse_info info;
   cryptonote::tx_destination_entry de;
 
-  bool r = cryptonote::get_account_address_from_str_or_url(info, m_wallet->nettype(), local_args[3], oa_prompter);
+  bool r = cryptonote::get_account_address_from_str_or_url(info, m_wallet->nettype(), address_str, oa_prompter);
   if (!r)
   {
     fail_msg_writer() << tr("failed to parse address");
     return false;
   }
 
-  bool ok = cryptonote::parse_amount(de.amount, local_args[4]);
-  if(!ok || 0 == de.amount)
+  bool ok = cryptonote::parse_amount(de.amount, amount_str);
+  if (!ok || 0 == de.amount)
   {
-    fail_msg_writer() << tr("amount is wrong: ") << local_args[3] << ' ' << local_args[4] <<
+    fail_msg_writer() << tr("amount is wrong: ") << address_str << ' ' << amount_str <<
       ", " << tr("expected number from 0 to ") << print_money(std::numeric_limits<uint64_t>::max());
     return false;
   }
 
-  de.original = local_args[3];
+  de.original = address_str;
   de.addr = info.address;
   de.is_subaddress = info.is_subaddress;
   de.is_integrated = info.has_payment_id;
 
   dsts.push_back(de);
+
+  // Remove address and amount from local_args to avoid re-processing
+  local_args.pop_back(); // amount
+  local_args.pop_back(); // address
 }
 
 
