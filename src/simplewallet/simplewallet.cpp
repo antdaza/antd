@@ -5742,52 +5742,57 @@ bool simple_wallet::article_main(int transfer_type, const std::vector<std::strin
 
   std::vector<std::string> local_args = args_;
 
-  std::vector<uint8_t> extra;
-
-  // Early check for article metadata format
-  bool has_article_metadata = (
-    local_args.size() >= 3 &&
-    local_args[0].rfind("article_title=", 0) == 0 &&
-    local_args[1].rfind("article_content=", 0) == 0 &&
-    local_args[2].rfind("article_publisher=", 0) == 0
-  );
-
-  if (has_article_metadata)
-  {
-    std::string title = local_args[0].substr(strlen("article_title="));
-    std::string content = local_args[1].substr(strlen("article_content="));
-    std::string publisher = local_args[2].substr(strlen("article_publisher="));
-
-    if (title.empty() || content.empty() || publisher.empty())
-    {
-      fail_msg_writer() << "Missing article metadata fields: title/content/publisher.";
-      return false;
-    }
-
-    if (title.size() > 128 || content.size() > 2048 || publisher.size() > 64)
-    {
-      fail_msg_writer() << "Article metadata too long (title ≤ 128, content ≤ 2048, publisher ≤ 64)";
-      return false;
-    }
-
-    std::ostringstream oss;
-    oss << "TITLE:" << title << ";CONTENT:" << content << ";PUBLISHER:" << publisher;
-    std::string blob = oss.str();
-
-    if (blob.size() > 255)
-    {
-      fail_msg_writer() << "Serialized article data too large for tx_extra.";
-      return false;
-    }
-
-if (!set_article_to_tx_extra(extra, title, content, publisher)) {
-  fail_msg_writer() << "Failed to encode article metadata into tx_extra";
+if (local_args.size() < 5) {
+  fail_msg_writer() << "Invalid syntax. Use quotes around metadata fields if they contain spaces.";
   return false;
 }
 
-    // Remove metadata args
-    local_args.erase(local_args.begin(), local_args.begin() + 3);
+  std::vector<uint8_t> extra;
+
+std::string title, content, publisher;
+bool has_article_metadata = false;
+
+for (const std::string& arg : local_args) {
+  if (arg.rfind("article_title=", 0) == 0) {
+    title = arg.substr(strlen("article_title="));
+    has_article_metadata = true;
+  } else if (arg.rfind("article_content=", 0) == 0) {
+    content = arg.substr(strlen("article_content="));
+  } else if (arg.rfind("article_publisher=", 0) == 0) {
+    publisher = arg.substr(strlen("article_publisher="));
   }
+}
+
+if (has_article_metadata) {
+  if (title.empty() || content.empty() || publisher.empty()) {
+    fail_msg_writer() << "Missing article metadata fields: title/content/publisher.";
+    return false;
+  }
+
+  if (title.size() > 128 || content.size() > 2048 || publisher.size() > 64) {
+    fail_msg_writer() << "Article metadata too long (title ≤ 128, content ≤ 2048, publisher ≤ 64)";
+    return false;
+  }
+
+  std::ostringstream oss;
+  oss << "TITLE:" << title << ";CONTENT:" << content << ";PUBLISHER:" << publisher;
+  std::string blob = oss.str();
+
+  if (blob.size() > 255) {
+    fail_msg_writer() << "Serialized article data too large for tx_extra.";
+    return false;
+  }
+
+  if (!set_article_to_tx_extra(extra, title, content, publisher)) {
+    fail_msg_writer() << "Failed to encode article metadata into tx_extra";
+    return false;
+  }
+
+  // Remove metadata args from local_args
+  local_args.erase(std::remove_if(local_args.begin(), local_args.end(), [](const std::string& s) {
+    return s.rfind("article_title=", 0) == 0 || s.rfind("article_content=", 0) == 0 || s.rfind("article_publisher=", 0) == 0;
+  }), local_args.end());
+}
 
   std::set<uint32_t> subaddr_indices;
   if (local_args.size() > 0 && local_args[0].substr(0, 6) == "index=")
@@ -5851,103 +5856,34 @@ if (!set_article_to_tx_extra(extra, title, content, publisher)) {
   vector<cryptonote::address_parse_info> dsts_info;
   vector<cryptonote::tx_destination_entry> dsts;
   size_t num_subaddresses = 0;
-  for (size_t i = 0; i < local_args.size(); )
+
+{
+  cryptonote::address_parse_info info;
+  cryptonote::tx_destination_entry de;
+
+  bool r = cryptonote::get_account_address_from_str_or_url(info, m_wallet->nettype(), local_args[3], oa_prompter);
+  if (!r)
   {
-    dsts_info.emplace_back();
-    cryptonote::address_parse_info & info = dsts_info.back();
-    cryptonote::tx_destination_entry de;
-    bool r = true;
-
-    // check for a URI
-    std::string address_uri, payment_id_uri, tx_description, recipient_name, error;
-    std::vector<std::string> unknown_parameters;
-    uint64_t amount = 0;
-    bool has_uri = m_wallet->parse_uri(local_args[i], address_uri, payment_id_uri, amount, tx_description, recipient_name, unknown_parameters,
-    error);
-    if (has_uri)
-    {
-      r = cryptonote::get_account_address_from_str_or_url(info, m_wallet->nettype(), address_uri, oa_prompter);
-      if (payment_id_uri.size() == 16)
-      {
-        if (!tools::wallet2::parse_short_payment_id(payment_id_uri, info.payment_id))
-        {
-          fail_msg_writer() << tr("failed to parse short payment ID from URI");
-          return false;
-        }
-        info.has_payment_id = true;
-      }
-      de.amount = amount;
-      de.original = local_args[i];
-      ++i;
-    }
-    else if (i + 1 < local_args.size())
-    {
-      r = cryptonote::get_account_address_from_str_or_url(info, m_wallet->nettype(), local_args[i], oa_prompter);
-      bool ok = cryptonote::parse_amount(de.amount, local_args[i + 1]);
-      if(!ok || 0 == de.amount)
-      {
-        fail_msg_writer() << tr("amount is wrong: ") << local_args[i] << ' ' << local_args[i + 1] <<
-          ", " << tr("expected number from 0 to ") << print_money(std::numeric_limits<uint64_t>::max());
-        return false;
-      }
-      de.original = local_args[i];
-      i += 2;
-    }
-    else
-    {
-      if (boost::starts_with(local_args[i], "antd:"))
-        fail_msg_writer() << tr("Invalid last argument: ") << local_args.back() << ": " << error;
-      else
-        fail_msg_writer() << tr("Invalid last argument: ") << local_args.back();
-      return false;
-    }
-
-    if (!r)
-    {
-      fail_msg_writer() << tr("failed to parse address");
-      return false;
-    }
-    de.addr = info.address;
-    de.is_subaddress = info.is_subaddress;
-    de.is_integrated = info.has_payment_id;
-    num_subaddresses += info.is_subaddress;
-
-    if (info.has_payment_id || !payment_id_uri.empty())
-    {
-      if (payment_id_seen)
-      {
-        fail_msg_writer() << tr("a single transaction cannot use more than one payment id");
-        return false;
-      }
-
-      crypto::hash payment_id;
-      std::string extra_nonce;
-      if (info.has_payment_id)
-      {
-        set_encrypted_payment_id_to_tx_extra_nonce(extra_nonce, info.payment_id);
-      }
-      else if (tools::wallet2::parse_payment_id(payment_id_uri, payment_id))
-      {
-        LONG_PAYMENT_ID_SUPPORT_CHECK();
-        set_payment_id_to_tx_extra_nonce(extra_nonce, payment_id);
-        message_writer() << tr("Unencrypted payment IDs are bad for privacy: ask the recipient to use subaddresses instead");
-      }
-      else
-      {
-        fail_msg_writer() << tr("failed to parse payment id, though it was detected");
-        return false;
-      }
-      bool r = add_extra_nonce_to_tx_extra(extra, extra_nonce);
-      if(!r)
-      {
-        fail_msg_writer() << tr("failed to set up payment id, though it was decoded correctly");
-        return false;
-      }
-      payment_id_seen = true;
-    }
-
-    dsts.push_back(de);
+    fail_msg_writer() << tr("failed to parse address");
+    return false;
   }
+
+  bool ok = cryptonote::parse_amount(de.amount, local_args[4]);
+  if(!ok || 0 == de.amount)
+  {
+    fail_msg_writer() << tr("amount is wrong: ") << local_args[3] << ' ' << local_args[4] <<
+      ", " << tr("expected number from 0 to ") << print_money(std::numeric_limits<uint64_t>::max());
+    return false;
+  }
+
+  de.original = local_args[3];
+  de.addr = info.address;
+  de.is_subaddress = info.is_subaddress;
+  de.is_integrated = info.has_payment_id;
+
+  dsts.push_back(de);
+}
+
 
   // prompt is there is no payment id and confirmation is required
   if (m_long_payment_id_support && !payment_id_seen && m_wallet->confirm_missing_payment_id() && dsts.size() > num_subaddresses)
