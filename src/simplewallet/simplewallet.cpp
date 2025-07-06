@@ -5734,36 +5734,44 @@ static bool set_article_to_tx_extra(std::vector<uint8_t>& extra, const std::stri
 }
 
 //----------------------------------------------------------------------------------------------------
-bool simple_wallet::article_main(int transfer_type, const std::vector<std::string> &args_, bool called_by_mms)
+bool simple_wallet::article_main(int transfer_type, const std::vector<std::string>& args_, bool called_by_mms)
 {
-//  "transfer [index=<N1>[,<N2>,...]] [<priority>] <address> <amount> [<payment_id>]"
   if (!try_connect_to_daemon())
     return false;
 
+  if (args_.size() < 5) {
+    fail_msg_writer() << "Usage: add_article <title words> : <content words> : <publisher words> <address> <amount>";
+    return false;
+  }
+
   std::vector<std::string> local_args = args_;
 
-if (local_args.size() < 5) {
-  fail_msg_writer() << "Invalid syntax. Use quotes around metadata fields if they contain spaces.";
-  return false;
-}
+  std::string title, content, publisher;
+  std::string address = local_args[local_args.size() - 2];
+  std::string amount  = local_args[local_args.size() - 1];
 
-  std::vector<uint8_t> extra;
+  size_t sep1 = std::find(local_args.begin(), local_args.end(), ":") - local_args.begin();
+  size_t sep2 = std::find(local_args.begin() + sep1 + 1, local_args.end(), ":") - local_args.begin();
 
-std::string title, content, publisher;
-bool has_article_metadata = false;
-
-for (const std::string& arg : local_args) {
-  if (arg.rfind("article_title=", 0) == 0) {
-    title = arg.substr(strlen("article_title="));
-    has_article_metadata = true;
-  } else if (arg.rfind("article_content=", 0) == 0) {
-    content = arg.substr(strlen("article_content="));
-  } else if (arg.rfind("article_publisher=", 0) == 0) {
-    publisher = arg.substr(strlen("article_publisher="));
+  if (sep1 >= local_args.size() || sep2 >= local_args.size() || sep2 <= sep1 + 1) {
+    fail_msg_writer() << "Missing ':' separators. Use format: <title...> : <content...> : <publisher...> <address> <amount>";
+    return false;
   }
-}
 
-if (has_article_metadata) {
+  for (size_t i = 0; i < sep1; ++i) {
+    title += local_args[i] + " ";
+  }
+  for (size_t i = sep1 + 1; i < sep2; ++i) {
+    content += local_args[i] + " ";
+  }
+  for (size_t i = sep2 + 1; i < local_args.size() - 2; ++i) {
+    publisher += local_args[i] + " ";
+  }
+
+  if (!title.empty()) title.pop_back();
+  if (!content.empty()) content.pop_back();
+  if (!publisher.empty()) publisher.pop_back();
+
   if (title.empty() || content.empty() || publisher.empty()) {
     fail_msg_writer() << "Missing article metadata fields: title/content/publisher.";
     return false;
@@ -5783,16 +5791,11 @@ if (has_article_metadata) {
     return false;
   }
 
+  std::vector<uint8_t> extra;
   if (!set_article_to_tx_extra(extra, title, content, publisher)) {
-    fail_msg_writer() << "Failed to encode article metadata into tx_extra";
+    fail_msg_writer() << "Failed to encode article metadata into tx_extra.";
     return false;
   }
-
-  // Remove metadata args from local_args
-  local_args.erase(std::remove_if(local_args.begin(), local_args.end(), [](const std::string& s) {
-    return s.rfind("article_title=", 0) == 0 || s.rfind("article_content=", 0) == 0 || s.rfind("article_publisher=", 0) == 0;
-  }), local_args.end());
-}
 
   std::set<uint32_t> subaddr_indices;
   if (local_args.size() > 0 && local_args[0].substr(0, 6) == "index=")
