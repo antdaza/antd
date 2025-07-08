@@ -5718,232 +5718,252 @@ bool simple_wallet::locked_transfer(const std::vector<std::string> &args_)
   return true;
 }
 
+//----------------------------------------------------------------------------------------------------
 static bool set_article_to_tx_extra(std::vector<uint8_t>& extra, const std::string& title, const std::string& content, const std::string& publisher)
 {
-  std::ostringstream oss;
-  oss << "TITLE:" << title << ";CONTENT:" << content << ";PUBLISHER:" << publisher;
-  std::string blob = oss.str();
+    LOG_PRINT_L0("Starting set_article_to_tx_extra, title size: " << title.size() << ", content size: " << content.size() << ", publisher size: " << publisher.size());
 
-  if (blob.size() > 255)
-    return false;
+    crypto::hash content_hash;
+    cn_fast_hash(content.data(), content.size(), content_hash);
+    std::string content_hash_hex = epee::string_tools::pod_to_hex(content_hash);
+    message_writer() << tr("Content hash: ") << content_hash_hex;
 
-  std::string extra_nonce;
-  extra_nonce = "ARTC" + blob; // 4-byte prefix
+    // Store content off-chain
+    std::string filename = content_hash_hex + ".txt";
+    std::ofstream file(filename);
+    if (!file) {
+        fail_msg_writer() << tr("Failed to open file for content storage: ") << filename;
+        return false;
+    }
+    file << content;
+    file.close();
+    message_writer() << tr("Stored content in file: ") << filename;
 
-  return add_extra_nonce_to_tx_extra(extra, extra_nonce);
+    std::ostringstream oss;
+    oss << "TITLE:" << title << ";CONTENT_HASH:" << content_hash_hex << ";PUBLISHER:" << publisher;
+    std::string blob = oss.str();
+
+    LOG_PRINT_L0("Serialized data size: " << blob.size());
+
+    if (blob.size() > 255 - 4) { // Account for ARTC prefix
+        fail_msg_writer() << tr("Serialized article data too large for tx_extra: ") << blob.size() << tr(" bytes");
+        return false;
+    }
+
+    std::string extra_nonce = "ARTC" + blob; // Match working version's prefix
+    if (!add_extra_nonce_to_tx_extra(extra, extra_nonce)) {
+        fail_msg_writer() << tr("Failed to add article metadata to tx_extra");
+        return false;
+    }
+
+    message_writer() << tr("Serialized article data, size: ") << extra_nonce.size();
+    return true;
 }
-
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::article_main(int transfer_type, const std::vector<std::string>& args_, bool called_by_mms)
 {
-  if (!try_connect_to_daemon())
-    return false;
-
-  if (args_.size() < 5) {
-    fail_msg_writer() << "Usage: add_article <title words> : <content words> : <publisher words> <address> <amount>";
-    return false;
-  }
-
-  std::vector<std::string> local_args = args_;
-
-  std::string title, content, publisher;
-  std::string address = local_args[local_args.size() - 2];
-  std::string amount  = local_args[local_args.size() - 1];
-
-  size_t sep1 = std::find(local_args.begin(), local_args.end(), ":") - local_args.begin();
-  size_t sep2 = std::find(local_args.begin() + sep1 + 1, local_args.end(), ":") - local_args.begin();
-
-  if (sep1 >= local_args.size() || sep2 >= local_args.size() || sep2 <= sep1 + 1) {
-    fail_msg_writer() << "Missing ':' separators. Use format: <title...> : <content...> : <publisher...> <address> <amount>";
-    return false;
-  }
-
-  for (size_t i = 0; i < sep1; ++i) {
-    title += local_args[i] + " ";
-  }
-  for (size_t i = sep1 + 1; i < sep2; ++i) {
-    content += local_args[i] + " ";
-  }
-  for (size_t i = sep2 + 1; i < local_args.size() - 2; ++i) {
-    publisher += local_args[i] + " ";
-  }
-
-  if (!title.empty()) title.pop_back();
-  if (!content.empty()) content.pop_back();
-  if (!publisher.empty()) publisher.pop_back();
-
-  if (title.empty() || content.empty() || publisher.empty()) {
-    fail_msg_writer() << "Missing article metadata fields: title/content/publisher.";
-    return false;
-  }
-
-  if (title.size() > 128 || content.size() > 2048 || publisher.size() > 64) {
-    fail_msg_writer() << "Article metadata too long (title ≤ 128, content ≤ 2048, publisher ≤ 64)";
-    return false;
-  }
-
-  std::ostringstream oss;
-  oss << "TITLE:" << title << ";CONTENT:" << content << ";PUBLISHER:" << publisher;
-  std::string blob = oss.str();
-
-  if (blob.size() > 255) {
-    fail_msg_writer() << "Serialized article data too large for tx_extra.";
-    return false;
-  }
-
-  std::vector<uint8_t> extra;
-  if (!set_article_to_tx_extra(extra, title, content, publisher)) {
-    fail_msg_writer() << "Failed to encode article metadata into tx_extra.";
-    return false;
-  }
-
-  std::set<uint32_t> subaddr_indices;
-  if (local_args.size() > 0 && local_args[0].substr(0, 6) == "index=")
-  {
-    std::string parse_subaddr_err;
-    if (!tools::parse_subaddress_indices(local_args[0], subaddr_indices, &parse_subaddr_err))
-    {
-      fail_msg_writer() << parse_subaddr_err;
-      return true;
+    LOG_PRINT_L0("Starting article_main");
+    if (!try_connect_to_daemon()) {
+        fail_msg_writer() << tr("Failed to connect to daemon");
+        return false;
     }
-    local_args.erase(local_args.begin());
-  }
 
-  uint32_t priority = 0;
-  if (local_args.size() > 0 && tools::parse_priority(local_args[0], priority))
-    local_args.erase(local_args.begin());
+    message_writer() << tr("Wallet network type: ") << (m_wallet->nettype() == cryptonote::MAINNET ? "mainnet" : m_wallet->nettype() == cryptonote::TESTNET ? "testnet" : "stagenet");
 
-  priority = m_wallet->adjust_priority(priority);
-
-  const size_t min_args = (transfer_type == TransferLocked) ? 2 : 1;
-  if(local_args.size() < min_args)
-  {
-     fail_msg_writer() << tr("wrong number of arguments");
-     return false;
-  }
-
-  bool payment_id_seen = false;
-  if (!local_args.empty())
-  {
-    std::string payment_id_str = local_args.back();
-    crypto::hash payment_id;
-    bool r = true;
-    if (tools::wallet2::parse_long_payment_id(payment_id_str, payment_id))
-    {
-      LONG_PAYMENT_ID_SUPPORT_CHECK();
-
-      std::string extra_nonce;
-      set_payment_id_to_tx_extra_nonce(extra_nonce, payment_id);
-      r = add_extra_nonce_to_tx_extra(extra, extra_nonce);
-      local_args.pop_back();
-      payment_id_seen = true;
-      message_writer() << tr("Unencrypted payment IDs are bad for privacy: ask the recipient to use subaddresses instead");
+    if (args_.size() < 5) {
+        fail_msg_writer() << "Usage: add_article <title words> : <content words> : <publisher words> <address> <amount>";
+        return false;
     }
-    if(!r)
-    {
-      fail_msg_writer() << tr("payment id failed to encode");
-      return false;
+
+    std::vector<std::string> local_args = args_;
+
+    std::string title, content, publisher;
+    std::string address = local_args[local_args.size() - 2];
+    std::string amount = local_args[local_args.size() - 1];
+
+    size_t sep1 = std::find(local_args.begin(), local_args.end(), ":") - local_args.begin();
+    size_t sep2 = std::find(local_args.begin() + sep1 + 1, local_args.end(), ":") - local_args.begin();
+
+    if (sep1 >= local_args.size() || sep2 >= local_args.size() || sep2 <= sep1 + 1) {
+        fail_msg_writer() << "Missing ':' separators. Use format: <title...> : <content...> : <publisher...> <address> <amount>";
+        return false;
     }
-  }
 
-  uint64_t locked_blocks = 0;
-  if (transfer_type == TransferLocked)
-  {
-    if (!locked_blocks_arg_valid(local_args.back(), locked_blocks))
-    {
-      return true;
+    for (size_t i = 0; i < sep1; ++i) {
+        title += local_args[i] + " ";
     }
-    local_args.pop_back();
-  }
+    for (size_t i = sep1 + 1; i < sep2; ++i) {
+        content += local_args[i] + " ";
+    }
+    for (size_t i = sep2 + 1; i < local_args.size() - 2; ++i) {
+        publisher += local_args[i] + " ";
+    }
 
-  vector<cryptonote::address_parse_info> dsts_info;
-  vector<cryptonote::tx_destination_entry> dsts;
-  size_t num_subaddresses = 0;
+    if (!title.empty()) title.pop_back();
+    if (!content.empty()) content.pop_back();
+    if (!publisher.empty()) publisher.pop_back();
 
-{
-  if (local_args.size() < 2)
-  {
-    fail_msg_writer() << tr("missing recipient address and amount");
-    return false;
-  }
+    if (title.empty() || content.empty() || publisher.empty()) {
+        fail_msg_writer() << "Missing article metadata fields: title/content/publisher.";
+        return false;
+    }
 
-  const std::string& address_str = local_args[local_args.size() - 2];
-  const std::string& amount_str  = local_args[local_args.size() - 1];
+    if (title.size() > 128 || content.size() > 3000 || publisher.size() > 64) {
+        fail_msg_writer() << "Article metadata too long (title ≤ 128, content ≤ 3000, publisher ≤ 64)";
+        return false;
+    }
 
-  cryptonote::address_parse_info info;
-  cryptonote::tx_destination_entry de;
+    std::vector<uint8_t> extra;
+    if (!set_article_to_tx_extra(extra, title, content, publisher)) {
+        fail_msg_writer() << "Failed to encode article metadata into tx_extra.";
+        return false;
+    }
 
-  bool r = cryptonote::get_account_address_from_str_or_url(info, m_wallet->nettype(), address_str, oa_prompter);
-  if (!r)
-  {
-    fail_msg_writer() << tr("failed to parse address");
-    return false;
-  }
-
-  bool ok = cryptonote::parse_amount(de.amount, amount_str);
-  if (!ok || 0 == de.amount)
-  {
-    fail_msg_writer() << tr("amount is wrong: ") << address_str << ' ' << amount_str <<
-      ", " << tr("expected number from 0 to ") << print_money(std::numeric_limits<uint64_t>::max());
-    return false;
-  }
-
-  de.original = address_str;
-  de.addr = info.address;
-  de.is_subaddress = info.is_subaddress;
-  de.is_integrated = info.has_payment_id;
-
-  dsts.push_back(de);
-
-  // Remove address and amount from local_args to avoid re-processing
-  local_args.pop_back(); // amount
-  local_args.pop_back(); // address
-}
-
-
-  // prompt is there is no payment id and confirmation is required
-  if (m_long_payment_id_support && !payment_id_seen && m_wallet->confirm_missing_payment_id() && dsts.size() > num_subaddresses)
-  {
-     std::string accepted = input_line(tr("No payment id is included with this transaction. Is this okay?"), true);
-     if (std::cin.eof())
-       return false;
-     if (!command_line::is_yes(accepted))
-     {
-       fail_msg_writer() << tr("transaction cancelled.");
-
-       return false;
-     }
-  }
-
-  SCOPED_WALLET_UNLOCK_ON_BAD_PASSWORD(return false;);
-
-  try
-  {
-    // figure out what tx will be necessary
-    std::vector<tools::wallet2::pending_tx> ptx_vector;
-    uint64_t bc_height, unlock_block = 0;
-    std::string err;
-    switch (transfer_type)
-    {
-      case TransferLocked:
-        bc_height = get_daemon_blockchain_height(err);
-        if (!err.empty())
-        {
-          fail_msg_writer() << tr("failed to get blockchain height: ") << err;
-          return false;
+    std::set<uint32_t> subaddr_indices;
+    if (local_args.size() > 0 && local_args[0].substr(0, 6) == "index=") {
+        std::string parse_subaddr_err;
+        message_writer() << tr("Parsing subaddress indices");
+        if (!tools::parse_subaddress_indices(local_args[0], subaddr_indices, &parse_subaddr_err)) {
+            fail_msg_writer() << parse_subaddr_err;
+            return false;
         }
-        unlock_block = bc_height + locked_blocks;
-        ptx_vector = m_wallet->create_transactions_2(dsts, CRYPTONOTE_DEFAULT_TX_MIXIN, unlock_block /* unlock_time */, priority, 
-        extra, m_current_subaddress_account, subaddr_indices);
-      break;
-      default:
-        LOG_ERROR("Unknown transfer method, using default");
-        /* FALLTHRU */
-      case Transfer:
-        ptx_vector = m_wallet->create_transactions_2(dsts, CRYPTONOTE_DEFAULT_TX_MIXIN, 0 /* unlock_time */, priority, extra,
-        m_current_subaddress_account, subaddr_indices);
-      break;
+        local_args.erase(local_args.begin());
+        message_writer() << tr("Subaddress indices parsed: ") << subaddr_indices.size();
     }
+
+    uint32_t priority = 0;
+    if (local_args.size() > 0 && tools::parse_priority(local_args[0], priority)) {
+        message_writer() << tr("Parsing priority");
+        local_args.erase(local_args.begin());
+    }
+    priority = m_wallet->adjust_priority(priority);
+    message_writer() << tr("Adjusted priority: ") << priority;
+
+    const size_t min_args = (transfer_type == TransferLocked) ? 2 : 1;
+    if (local_args.size() < min_args) {
+        fail_msg_writer() << tr("wrong number of arguments");
+        return false;
+    }
+
+    bool payment_id_seen = false;
+    if (!local_args.empty()) {
+        std::string payment_id_str = local_args.back();
+        crypto::hash payment_id;
+        message_writer() << tr("Checking for payment ID");
+        if (tools::wallet2::parse_long_payment_id(payment_id_str, payment_id)) {
+            message_writer() << tr("Found payment ID: ") << payment_id_str;
+            std::string extra_nonce;
+            set_payment_id_to_tx_extra_nonce(extra_nonce, payment_id);
+            if (!add_extra_nonce_to_tx_extra(extra, extra_nonce)) {
+                fail_msg_writer() << tr("payment id failed to encode");
+                return false;
+            }
+            local_args.pop_back();
+            payment_id_seen = true;
+            message_writer() << tr("Added payment ID to tx_extra");
+            message_writer() << tr("Unencrypted payment IDs are bad for privacy: ask the recipient to use subaddresses instead");
+        }
+    }
+
+    uint64_t locked_blocks = 0;
+    if (transfer_type == TransferLocked) {
+        message_writer() << tr("Handling locked transfer");
+        if (!locked_blocks_arg_valid(local_args.back(), locked_blocks)) {
+            fail_msg_writer() << tr("Invalid locked blocks value");
+            return false;
+        }
+        local_args.pop_back();
+    }
+
+    std::vector<cryptonote::address_parse_info> dsts_info;
+    std::vector<cryptonote::tx_destination_entry> dsts;
+    size_t num_subaddresses = 0;
+
+    if (local_args.size() < 2) {
+        fail_msg_writer() << tr("missing recipient address and amount");
+        return false;
+    }
+
+    const std::string& address_str = local_args[local_args.size() - 2];
+    const std::string& amount_str = local_args[local_args.size() - 1];
+
+    cryptonote::address_parse_info info;
+    cryptonote::tx_destination_entry de;
+
+    message_writer() << tr("Parsing destination address: ") << address_str;
+    bool r = cryptonote::get_account_address_from_str_or_url(info, m_wallet->nettype(), address_str, oa_prompter);
+    if (!r) {
+        fail_msg_writer() << tr("failed to parse address: ") << address_str;
+        return false;
+    }
+    message_writer() << tr("Successfully parsed address, is_subaddress: ") << info.is_subaddress << ", has_payment_id: " << info.has_payment_id;
+
+    message_writer() << tr("Parsing amount: ") << amount_str;
+    bool ok = cryptonote::parse_amount(de.amount, amount_str);
+    if (!ok || 0 == de.amount) {
+        fail_msg_writer() << tr("amount is wrong: ") << address_str << ' ' << amount_str << ", " << tr("expected number from 0 to ") << print_money(std::numeric_limits<uint64_t>::max());
+        return false;
+    }
+    message_writer() << tr("Successfully parsed amount: ") << de.amount;
+
+    de.original = address_str;
+    de.addr = info.address;
+    de.is_subaddress = info.is_subaddress;
+    de.is_integrated = info.has_payment_id;
+    dsts.push_back(de);
+
+    local_args.pop_back(); // amount
+    local_args.pop_back(); // address
+
+    if (m_long_payment_id_support && !payment_id_seen && m_wallet->confirm_missing_payment_id() && dsts.size() > num_subaddresses) {
+        std::string accepted = input_line(tr("No payment id is included with this transaction. Is this okay?"), true);
+        if (std::cin.eof()) {
+            fail_msg_writer() << tr("EOF on input");
+            return false;
+        }
+        if (!command_line::is_yes(accepted)) {
+            fail_msg_writer() << tr("transaction cancelled.");
+            return false;
+        }
+        message_writer() << tr("Confirmed no payment ID");
+    }
+
+    message_writer() << tr("Checking wallet balance for account: ") << m_current_subaddress_account;
+    uint64_t balance = m_wallet->balance(m_current_subaddress_account);
+    uint64_t unlocked_balance = m_wallet->unlocked_balance(m_current_subaddress_account);
+    message_writer() << tr("Wallet balance: ") << print_money(balance) << ", Unlocked balance: " << print_money(unlocked_balance);
+    if (unlocked_balance < de.amount) {
+        fail_msg_writer() << tr("Insufficient unlocked funds: balance ") << print_money(balance) << ", unlocked " << print_money(unlocked_balance) << ", required " << print_money(de.amount);
+        return false;
+    }
+
+    std::vector<tools::wallet2::get_outs_entry> outs;
+
+    message_writer() << tr("Unlocking wallet");
+    SCOPED_WALLET_UNLOCK_ON_BAD_PASSWORD(
+        fail_msg_writer() << tr("Invalid wallet password");
+        return false;
+    );
+
+    try {
+        const uint64_t mixin_count = CRYPTONOTE_DEFAULT_TX_MIXIN; // 9
+        message_writer() << tr("Creating transaction with mixin: ") << mixin_count << ", priority: " << priority << ", account: " << m_current_subaddress_account;
+        std::vector<tools::wallet2::pending_tx> ptx_vector;
+        uint64_t bc_height, unlock_block = 0;
+        std::string err;
+        if (transfer_type == TransferLocked) {
+            message_writer() << tr("Fetching blockchain height for locked transfer");
+            bc_height = get_daemon_blockchain_height(err);
+            if (!err.empty()) {
+                fail_msg_writer() << tr("failed to get blockchain height: ") << err;
+                return false;
+            }
+            unlock_block = bc_height + locked_blocks;
+            message_writer() << tr("Blockchain height: ") << bc_height << ", unlock block: " << unlock_block;
+            ptx_vector = m_wallet->create_transactions_2(dsts, mixin_count, unlock_block, priority, extra, m_current_subaddress_account, subaddr_indices);
+        } else {
+            ptx_vector = m_wallet->create_transactions_2(dsts, mixin_count, 0 /* unlock_time */, priority, extra, m_current_subaddress_account, subaddr_indices);
+        }
 
     if (ptx_vector.empty())
     {
@@ -6207,70 +6227,83 @@ static std::string get_article_metadata(const std::vector<uint8_t>& extra)
 //-------------------------------------------
 bool cryptonote::simple_wallet::show_articles(const std::vector<std::string>& args)
 {
-  const std::string prefix = "ARTC";
-  bool found = false;
+    const std::string prefix = "ARTC";
+    bool found = false;
 
-  // Helper to extract ARTC blob
-  auto get_article_metadata = [prefix](const std::vector<uint8_t>& extra) -> std::string {
-    std::string extra_nonce;
-    if (!get_tx_extra_nonce(extra, extra_nonce))
-      return {};
+    // Helper to extract ARTC blob
+    auto get_article_metadata = [prefix](const std::vector<uint8_t>& extra) -> std::string {
+        std::string extra_nonce;
+        if (!get_tx_extra_nonce(extra, extra_nonce))
+            return {};
 
-    if (extra_nonce.size() < prefix.size())
-      return {};
+        if (extra_nonce.size() < prefix.size())
+            return {};
 
-    if (extra_nonce.compare(0, prefix.size(), prefix) != 0)
-      return {};
+        if (extra_nonce.compare(0, prefix.size(), prefix) != 0)
+            return {};
 
-    return extra_nonce.substr(prefix.size()); // Skip "ARTC"
-  };
+        return extra_nonce.substr(prefix.size()); // Skip "ARTC"
+    };
 
-  // Print a parsed article line
-  auto print_article = [](const std::string& blob, const crypto::hash& txid) {
-    std::string title, content, publisher;
-    size_t t_pos = blob.find("TITLE:");
-    size_t c_pos = blob.find(";CONTENT:");
-    size_t p_pos = blob.find(";PUBLISHER:");
+    // Helper to read content from file
+    auto read_content_from_file = [](const std::string& content_hash_hex) -> std::string {
+        std::string filename = content_hash_hex + ".txt";
+        std::ifstream file(filename);
+        if (!file) {
+            return "Error: Content file not found (" + filename + ")";
+        }
 
-    if (t_pos != 0 || c_pos == std::string::npos || p_pos == std::string::npos || c_pos < 6 || p_pos < c_pos + 9)
-    {
-      message_writer() << "Malformed article in tx: " << epee::string_tools::pod_to_hex(txid);
-      return;
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        return buffer.str();
+    };
+
+    // Print a parsed article line
+    auto print_article = [this, &read_content_from_file](const std::string& blob, const crypto::hash& txid) {
+        std::string title, content_hash_hex, publisher;
+        size_t t_pos = blob.find("TITLE:");
+        size_t c_pos = blob.find(";CONTENT_HASH:");
+        size_t p_pos = blob.find(";PUBLISHER:");
+
+        if (t_pos != 0 || c_pos == std::string::npos || p_pos == std::string::npos || c_pos < 6 || p_pos < c_pos + 13) {
+            message_writer() << "Malformed article in tx: " << epee::string_tools::pod_to_hex(txid);
+            return;
+        }
+
+        title = blob.substr(6, c_pos - 6);
+        content_hash_hex = blob.substr(c_pos + 13, p_pos - (c_pos + 13));
+        publisher = blob.substr(p_pos + 11);
+
+        // Load content from file
+        std::string content = read_content_from_file(content_hash_hex);
+
+        message_writer() << "\nArticle from txid: " << epee::string_tools::pod_to_hex(txid);
+        message_writer() << "  Title    : " << title;
+        message_writer() << "  Content  : " << content;
+        message_writer() << "  Content Hash: " << content_hash_hex;
+        message_writer() << "  Publisher: " << publisher;
+    };
+
+    // Scan Incoming and Outgoing Transfers
+    tools::wallet2::transfer_container transfers;
+    m_wallet->get_transfers(transfers); // Get both incoming and outgoing
+
+    for (const auto& entry : transfers) {
+        const tools::wallet2::transfer_details& td = entry;
+        const cryptonote::transaction_prefix& tx = td.m_tx; // Use transaction_prefix
+
+        std::string blob = get_article_metadata(tx.extra);
+        if (!blob.empty()) {
+            print_article(blob, td.m_txid);
+            found = true;
+        }
     }
 
-    title = blob.substr(6, c_pos - 6);
-    content = blob.substr(c_pos + 9, p_pos - (c_pos + 9));
-    publisher = blob.substr(p_pos + 11);
-
-    message_writer() << "\nArticle from txid: " << epee::string_tools::pod_to_hex(txid);
-    message_writer() << "  Title    : " << title;
-    message_writer() << "  Content  : " << content;
-    message_writer() << "  Publisher: " << publisher;
-  };
-
-  // Scan Incoming and Outgoing Transfers
-  tools::wallet2::transfer_container transfers;
-  m_wallet->get_transfers(transfers); // Get both incoming and outgoing
-
-  for (const auto& entry : transfers)
-  {
-    const tools::wallet2::transfer_details& td = entry;
-    const cryptonote::transaction_prefix& tx = td.m_tx; // Use transaction_prefix
-
-    std::string blob = get_article_metadata(tx.extra);
-    if (!blob.empty())
-    {
-      print_article(blob, td.m_txid);
-      found = true;
+    if (!found) {
+        message_writer() << "No articles found in wallet transfer history.";
     }
-  }
 
-  if (!found)
-  {
-    message_writer() << "No articles found in wallet transfer history.";
-  }
-
-  return true;
+    return true;
 }
 //-------------------------------------------------------------------------
 bool simple_wallet::locked_sweep_all(const std::vector<std::string> &args_)

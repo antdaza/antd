@@ -1,0 +1,923 @@
+src/simplewallet/simplewallet.cpp:  m_wallet->stop(); \
+src/simplewallet/simplewallet.cpp:  if (m_wallet->ask_password() && !(pwd_container = get_and_verify_password())) { code; } \
+src/simplewallet/simplewallet.cpp:  if (m_wallet->key_on_device()) {
+src/simplewallet/simplewallet.cpp:    print_secret_key(m_wallet->get_account().get_keys().m_view_secret_key);
+src/simplewallet/simplewallet.cpp:  std::cout << "public: " << string_tools::pod_to_hex(m_wallet->get_account().get_keys().m_account_address.m_view_public_key) << std::endl;
+src/simplewallet/simplewallet.cpp:  if (m_wallet->watch_only())
+src/simplewallet/simplewallet.cpp:  if (m_wallet->key_on_device()) {
+src/simplewallet/simplewallet.cpp:    print_secret_key(m_wallet->get_account().get_keys().m_spend_secret_key);
+src/simplewallet/simplewallet.cpp:  std::cout << "public: " << string_tools::pod_to_hex(m_wallet->get_account().get_keys().m_account_address.m_spend_public_key) << std::endl;
+src/simplewallet/simplewallet.cpp:  if (m_wallet->key_on_device())
+src/simplewallet/simplewallet.cpp:  if (m_wallet->watch_only())
+src/simplewallet/simplewallet.cpp:  multisig = m_wallet->multisig(&ready);
+src/simplewallet/simplewallet.cpp:  if (!multisig && !m_wallet->is_deterministic())
+src/simplewallet/simplewallet.cpp:    success = m_wallet->get_multisig_seed(seed, seed_pass);
+src/simplewallet/simplewallet.cpp:  else if (m_wallet->is_deterministic())
+src/simplewallet/simplewallet.cpp:    success = m_wallet->get_seed(seed, seed_pass);
+src/simplewallet/simplewallet.cpp:  if (m_wallet->key_on_device())
+src/simplewallet/simplewallet.cpp:  if (m_wallet->multisig())
+src/simplewallet/simplewallet.cpp:  if (m_wallet->watch_only())
+src/simplewallet/simplewallet.cpp:    if (!m_wallet->is_deterministic())
+src/simplewallet/simplewallet.cpp:  m_wallet->set_seed_language(std::move(mnemonic_language));
+src/simplewallet/simplewallet.cpp:  m_wallet->rewrite(m_wallet_file, password);
+src/simplewallet/simplewallet.cpp:    m_wallet->change_password(m_wallet_file, orig_pwd_container->password(), pwd_container->password());
+src/simplewallet/simplewallet.cpp:  const bool per_byte = m_wallet->use_fork_rules(HF_VERSION_PER_BYTE_FEE);
+src/simplewallet/simplewallet.cpp:  const uint64_t base_fee = m_wallet->get_base_fee();
+src/simplewallet/simplewallet.cpp:    uint64_t mult = m_wallet->get_fee_multiplier(priority);
+src/simplewallet/simplewallet.cpp:    blocks = m_wallet->estimate_backlog(base_size, base_size + size_granularity - 1, fees);
+src/simplewallet/simplewallet.cpp:      if (priority == m_wallet->get_default_priority() || (m_wallet->get_default_priority() == 0 && priority == 2))
+src/simplewallet/simplewallet.cpp:  if (m_wallet->key_on_device())
+src/simplewallet/simplewallet.cpp:  if (m_wallet->multisig())
+src/simplewallet/simplewallet.cpp:  if (m_wallet->watch_only())
+src/simplewallet/simplewallet.cpp:  if(m_wallet->get_num_transfer_details())
+src/simplewallet/simplewallet.cpp:  std::string multisig_info = m_wallet->get_multisig_info();
+src/simplewallet/simplewallet.cpp:  if (m_wallet->key_on_device())
+src/simplewallet/simplewallet.cpp:  if (m_wallet->multisig())
+src/simplewallet/simplewallet.cpp:  if (m_wallet->watch_only())
+src/simplewallet/simplewallet.cpp:  if(m_wallet->get_num_transfer_details())
+src/simplewallet/simplewallet.cpp:    std::string multisig_extra_info = m_wallet->make_multisig(orig_pwd_container->password(), local_args, threshold);
+src/simplewallet/simplewallet.cpp:  if (!m_wallet->multisig(NULL, &threshold, &total))
+src/simplewallet/simplewallet.cpp:      << m_wallet->get_account().get_public_address_str(m_wallet->nettype());
+src/simplewallet/simplewallet.cpp:  if (m_wallet->key_on_device())
+src/simplewallet/simplewallet.cpp:  if (!m_wallet->multisig(&ready))
+src/simplewallet/simplewallet.cpp:    if (!m_wallet->finalize_multisig(pwd_container->password(), args))
+src/simplewallet/simplewallet.cpp:    if (m_wallet->key_on_device())
+src/simplewallet/simplewallet.cpp:    if (!m_wallet->multisig(&ready))
+src/simplewallet/simplewallet.cpp:      std::string multisig_extra_info = m_wallet->exchange_multisig_keys(orig_pwd_container->password(), args);
+src/simplewallet/simplewallet.cpp:        m_wallet->multisig(NULL, &threshold, &total);
+src/simplewallet/simplewallet.cpp:        success_msg_writer() << tr("Multisig address: ") << m_wallet->get_account().get_public_address_str(m_wallet->nettype());
+src/simplewallet/simplewallet.cpp:  if (m_wallet->key_on_device())
+src/simplewallet/simplewallet.cpp:  if (!m_wallet->multisig(&ready))
+src/simplewallet/simplewallet.cpp:  if (!called_by_mms && m_wallet->confirm_export_overwrite() && !check_file_overwrite(filename))
+src/simplewallet/simplewallet.cpp:    cryptonote::blobdata ciphertext = m_wallet->export_multisig();
+src/simplewallet/simplewallet.cpp:  if (m_wallet->key_on_device())
+src/simplewallet/simplewallet.cpp:  if (!m_wallet->multisig(&ready, &threshold, &total))
+src/simplewallet/simplewallet.cpp:    size_t n_outputs = m_wallet->import_multisig(info);
+src/simplewallet/simplewallet.cpp:  if (m_wallet->is_trusted_daemon())
+src/simplewallet/simplewallet.cpp:      m_wallet->rescan_spent();
+src/simplewallet/simplewallet.cpp:  if (m_wallet->key_on_device())
+src/simplewallet/simplewallet.cpp:  if(!m_wallet->multisig(&ready))
+src/simplewallet/simplewallet.cpp:      bool r = m_wallet->load_multisig_tx(args[0], exported_txs, [&](const tools::wallet2::multisig_tx_set &tx){ signers = tx.m_signers.size(); return accept_loaded_tx(tx); });
+src/simplewallet/simplewallet.cpp:        r = m_wallet->sign_multisig_tx(exported_txs, txids);
+src/simplewallet/simplewallet.cpp:        ciphertext = m_wallet->save_multisig_tx(exported_txs);
+src/simplewallet/simplewallet.cpp:      bool r = m_wallet->sign_multisig_tx_from_file(filename, txids, [&](const tools::wallet2::multisig_tx_set &tx){ signers = tx.m_signers.size(); return accept_loaded_tx(tx); });
+src/simplewallet/simplewallet.cpp:    m_wallet->multisig(NULL, &threshold);
+src/simplewallet/simplewallet.cpp:  if (m_wallet->key_on_device())
+src/simplewallet/simplewallet.cpp:  if (!m_wallet->multisig(&ready, &threshold))
+src/simplewallet/simplewallet.cpp:      bool r = m_wallet->load_multisig_tx(args[0], txs, [&](const tools::wallet2::multisig_tx_set &tx){ return accept_loaded_tx(tx); });
+src/simplewallet/simplewallet.cpp:      bool r = m_wallet->load_multisig_tx_from_file(filename, txs, [&](const tools::wallet2::multisig_tx_set &tx){ return accept_loaded_tx(tx); });
+src/simplewallet/simplewallet.cpp:      m_wallet->commit_tx(ptx);
+src/simplewallet/simplewallet.cpp:    handle_transfer_exception(std::current_exception(), m_wallet->is_trusted_daemon());
+src/simplewallet/simplewallet.cpp:  if (m_wallet->key_on_device())
+src/simplewallet/simplewallet.cpp:  if (!m_wallet->multisig(&ready, &threshold))
+src/simplewallet/simplewallet.cpp:  if (m_wallet->confirm_export_overwrite() && !check_file_overwrite(filename))
+src/simplewallet/simplewallet.cpp:    bool r = m_wallet->load_multisig_tx_from_file(filename, txs, [&](const tools::wallet2::multisig_tx_set &tx){ return accept_loaded_tx(tx); });
+src/simplewallet/simplewallet.cpp:    if (m_wallet->get_ring(key_image, ring))
+src/simplewallet/simplewallet.cpp:    else if (!m_wallet->get_rings(txid, rings))
+src/simplewallet/simplewallet.cpp:        if (!m_wallet->set_ring(key_image, ring, relative))
+src/simplewallet/simplewallet.cpp:  if (!m_wallet->set_ring(key_image, ring, relative))
+src/simplewallet/simplewallet.cpp:      m_wallet->blackball_output(std::make_pair(amount, offset));
+src/simplewallet/simplewallet.cpp:        m_wallet->set_blackballed_outputs(outputs, add);
+src/simplewallet/simplewallet.cpp:    m_wallet->unblackball_output(output);
+src/simplewallet/simplewallet.cpp:    if (m_wallet->is_output_blackballed(output))
+src/simplewallet/simplewallet.cpp:    m_wallet->find_and_save_rings();
+src/simplewallet/simplewallet.cpp:  m_wallet->cold_sign_tx(ptx_vector, exported_txs, dsts_info, tx_aux);
+src/simplewallet/simplewallet.cpp:  m_wallet->cold_tx_aux_import(exported_txs.ptx, tx_aux);
+src/simplewallet/simplewallet.cpp:  return m_wallet->import_key_images(exported_txs.key_images);
+src/simplewallet/simplewallet.cpp:      m_wallet->always_confirm_transfers(r);
+src/simplewallet/simplewallet.cpp:      m_wallet->rewrite(m_wallet_file, pwd_container->password());
+src/simplewallet/simplewallet.cpp:      m_wallet->print_ring_members(r);
+src/simplewallet/simplewallet.cpp:      m_wallet->rewrite(m_wallet_file, pwd_container->password());
+src/simplewallet/simplewallet.cpp:  if (m_wallet->watch_only())
+src/simplewallet/simplewallet.cpp:      m_wallet->store_tx_info(r);
+src/simplewallet/simplewallet.cpp:      m_wallet->rewrite(m_wallet_file, pwd_container->password());
+src/simplewallet/simplewallet.cpp:      m_wallet->set_default_priority(priority);
+src/simplewallet/simplewallet.cpp:      m_wallet->rewrite(m_wallet_file, pwd_container->password());
+src/simplewallet/simplewallet.cpp:      m_wallet->auto_refresh(auto_refresh);
+src/simplewallet/simplewallet.cpp:      m_wallet->rewrite(m_wallet_file, pwd_container->password());
+src/simplewallet/simplewallet.cpp:    m_wallet->set_refresh_type(refresh_type);
+src/simplewallet/simplewallet.cpp:    m_wallet->rewrite(m_wallet_file, pwd_container->password());
+src/simplewallet/simplewallet.cpp:      m_wallet->confirm_missing_payment_id(r);
+src/simplewallet/simplewallet.cpp:      m_wallet->rewrite(m_wallet_file, pwd_container->password());
+src/simplewallet/simplewallet.cpp:    const tools::wallet2::AskPasswordType cur_ask = m_wallet->ask_password();
+src/simplewallet/simplewallet.cpp:    if (!m_wallet->watch_only())
+src/simplewallet/simplewallet.cpp:        m_wallet->decrypt_keys(pwd_container->password());
+src/simplewallet/simplewallet.cpp:        m_wallet->encrypt_keys(pwd_container->password());
+src/simplewallet/simplewallet.cpp:    m_wallet->ask_password(ask);
+src/simplewallet/simplewallet.cpp:    m_wallet->rewrite(m_wallet_file, pwd_container->password());
+src/simplewallet/simplewallet.cpp:    m_wallet->rewrite(m_wallet_file, pwd_container->password());
+src/simplewallet/simplewallet.cpp:    m_wallet->set_min_output_count(count);
+src/simplewallet/simplewallet.cpp:    m_wallet->rewrite(m_wallet_file, pwd_container->password());
+src/simplewallet/simplewallet.cpp:    m_wallet->set_min_output_value(value);
+src/simplewallet/simplewallet.cpp:    m_wallet->rewrite(m_wallet_file, pwd_container->password());
+src/simplewallet/simplewallet.cpp:      m_wallet->merge_destinations(r);
+src/simplewallet/simplewallet.cpp:      m_wallet->rewrite(m_wallet_file, pwd_container->password());
+src/simplewallet/simplewallet.cpp:      m_wallet->confirm_backlog(r);
+src/simplewallet/simplewallet.cpp:      m_wallet->rewrite(m_wallet_file, pwd_container->password());
+src/simplewallet/simplewallet.cpp:    m_wallet->set_confirm_backlog_threshold(threshold);
+src/simplewallet/simplewallet.cpp:    m_wallet->rewrite(m_wallet_file, pwd_container->password());
+src/simplewallet/simplewallet.cpp:      m_wallet->confirm_export_overwrite(r);
+src/simplewallet/simplewallet.cpp:      m_wallet->rewrite(m_wallet_file, pwd_container->password());
+src/simplewallet/simplewallet.cpp:    m_wallet->set_refresh_from_block_height(height);
+src/simplewallet/simplewallet.cpp:    m_wallet->rewrite(m_wallet_file, pwd_container->password());
+src/simplewallet/simplewallet.cpp:      m_wallet->auto_low_priority(r);
+src/simplewallet/simplewallet.cpp:      m_wallet->rewrite(m_wallet_file, pwd_container->password());
+src/simplewallet/simplewallet.cpp:      m_wallet->segregate_pre_fork_outputs(r);
+src/simplewallet/simplewallet.cpp:      m_wallet->rewrite(m_wallet_file, pwd_container->password());
+src/simplewallet/simplewallet.cpp:      m_wallet->key_reuse_mitigation2(r);
+src/simplewallet/simplewallet.cpp:      m_wallet->rewrite(m_wallet_file, pwd_container->password());
+src/simplewallet/simplewallet.cpp:      m_wallet->set_subaddress_lookahead(lookahead->first, lookahead->second);
+src/simplewallet/simplewallet.cpp:      m_wallet->rewrite(m_wallet_file, pwd_container->password());
+src/simplewallet/simplewallet.cpp:    m_wallet->segregation_height(height);
+src/simplewallet/simplewallet.cpp:    m_wallet->rewrite(m_wallet_file, pwd_container->password());
+src/simplewallet/simplewallet.cpp:      m_wallet->ignore_fractional_outputs(r);
+src/simplewallet/simplewallet.cpp:      m_wallet->rewrite(m_wallet_file, pwd_container->password());
+src/simplewallet/simplewallet.cpp:      m_wallet->track_uses(r);
+src/simplewallet/simplewallet.cpp:      m_wallet->rewrite(m_wallet_file, pwd_container->password());
+src/simplewallet/simplewallet.cpp:    m_wallet->device_name(args[0]);
+src/simplewallet/simplewallet.cpp:      r = m_wallet->reconnect_device();
+src/simplewallet/simplewallet.cpp:    std::string seed_language = m_wallet->get_seed_language();
+src/simplewallet/simplewallet.cpp:    uint32_t priority = m_wallet->get_default_priority();
+src/simplewallet/simplewallet.cpp:    switch (m_wallet->ask_password())
+src/simplewallet/simplewallet.cpp:    success_msg_writer() << "always-confirm-transfers = " << m_wallet->always_confirm_transfers();
+src/simplewallet/simplewallet.cpp:    success_msg_writer() << "print-ring-members = " << m_wallet->print_ring_members();
+src/simplewallet/simplewallet.cpp:    success_msg_writer() << "store-tx-info = " << m_wallet->store_tx_info();
+src/simplewallet/simplewallet.cpp:    success_msg_writer() << "auto-refresh = " << m_wallet->auto_refresh();
+src/simplewallet/simplewallet.cpp:    success_msg_writer() << "refresh-type = " << get_refresh_type_name(m_wallet->get_refresh_type());
+src/simplewallet/simplewallet.cpp:    success_msg_writer() << "confirm-missing-payment-id = " << m_wallet->confirm_missing_payment_id();
+src/simplewallet/simplewallet.cpp:    success_msg_writer() << "ask-password = " << m_wallet->ask_password() << " (" << ask_password_string << ")";
+src/simplewallet/simplewallet.cpp:    success_msg_writer() << "min-outputs-count = " << m_wallet->get_min_output_count();
+src/simplewallet/simplewallet.cpp:    success_msg_writer() << "min-outputs-value = " << cryptonote::print_money(m_wallet->get_min_output_value());
+src/simplewallet/simplewallet.cpp:    success_msg_writer() << "merge-destinations = " << m_wallet->merge_destinations();
+src/simplewallet/simplewallet.cpp:    success_msg_writer() << "confirm-backlog = " << m_wallet->confirm_backlog();
+src/simplewallet/simplewallet.cpp:    success_msg_writer() << "confirm-backlog-threshold = " << m_wallet->get_confirm_backlog_threshold();
+src/simplewallet/simplewallet.cpp:    success_msg_writer() << "confirm-export-overwrite = " << m_wallet->confirm_export_overwrite();
+src/simplewallet/simplewallet.cpp:    success_msg_writer() << "refresh-from-block-height = " << m_wallet->get_refresh_from_block_height();
+src/simplewallet/simplewallet.cpp:    success_msg_writer() << "auto-low-priority = " << m_wallet->auto_low_priority();
+src/simplewallet/simplewallet.cpp:    success_msg_writer() << "segregate-pre-fork-outputs = " << m_wallet->segregate_pre_fork_outputs();
+src/simplewallet/simplewallet.cpp:    success_msg_writer() << "key-reuse-mitigation2 = " << m_wallet->key_reuse_mitigation2();
+src/simplewallet/simplewallet.cpp:    const std::pair<size_t, size_t> lookahead = m_wallet->get_subaddress_lookahead();
+src/simplewallet/simplewallet.cpp:    success_msg_writer() << "segregation-height = " << m_wallet->segregation_height();
+src/simplewallet/simplewallet.cpp:    success_msg_writer() << "ignore-fractional-outputs = " << m_wallet->ignore_fractional_outputs();
+src/simplewallet/simplewallet.cpp:    success_msg_writer() << "track-uses = " << m_wallet->track_uses();
+src/simplewallet/simplewallet.cpp:    success_msg_writer() << "device_name = " << m_wallet->device_name();
+src/simplewallet/simplewallet.cpp:    "your email or on file storage services outside of your immediate control.\n")) % (m_wallet->multisig() ? tr("string") : tr("25 words"));
+src/simplewallet/simplewallet.cpp:          multisig_keys = m_wallet->decrypt<epee::wipeable_string>(std::string(multisig_keys.data(), multisig_keys.size()), key, true);
+src/simplewallet/simplewallet.cpp:        m_wallet_file = m_wallet->path();
+src/simplewallet/simplewallet.cpp:      if(m_wallet->get_refresh_from_block_height() == 0) {
+src/simplewallet/simplewallet.cpp:        m_wallet->set_refresh_from_block_height(m_wallet->estimate_blockchain_height());
+src/simplewallet/simplewallet.cpp:        m_wallet->explicit_refresh_from_block_height(true);
+src/simplewallet/simplewallet.cpp:        m_restore_height = m_wallet->get_refresh_from_block_height();
+src/simplewallet/simplewallet.cpp:      m_wallet->explicit_refresh_from_block_height(!(command_line::is_arg_defaulted(vm, arg_restore_height) ||
+src/simplewallet/simplewallet.cpp:          m_restore_height = m_wallet->get_blockchain_height_by_date(year, month, day);
+src/simplewallet/simplewallet.cpp:    if (!m_wallet->explicit_refresh_from_block_height() && m_restoring)
+src/simplewallet/simplewallet.cpp:            m_restore_height = m_wallet->get_blockchain_height_by_date(year, month, day);
+src/simplewallet/simplewallet.cpp:      uint64_t estimate_height = m_wallet->estimate_blockchain_height();
+src/simplewallet/simplewallet.cpp:      m_wallet->set_refresh_from_block_height(m_restore_height);
+src/simplewallet/simplewallet.cpp:    m_wallet->rewrite(m_wallet_file, password);
+src/simplewallet/simplewallet.cpp:  if (!m_wallet->is_trusted_daemon())
+src/simplewallet/simplewallet.cpp:    message_writer() << (boost::format(tr("Warning: using an untrusted daemon at %s, privacy will be lessened")) % m_wallet->get_daemon_address()).str();
+src/simplewallet/simplewallet.cpp:  if (m_wallet->get_ring_database().empty())
+src/simplewallet/simplewallet.cpp:  m_wallet->callback(this);
+src/simplewallet/simplewallet.cpp:  if (!m_wallet->check_connection(version))
+src/simplewallet/simplewallet.cpp:      fail_msg_writer() << tr("wallet failed to connect to daemon: ") << m_wallet->get_daemon_address() << ". " <<
+src/simplewallet/simplewallet.cpp:      fail_msg_writer() << boost::format(tr("Daemon uses a different RPC major version (%u) than the wallet (%u): %s. Either update one of them, or use --allow-mismatched-daemon-version.")) % (*version>>16) % CORE_RPC_VERSION_MAJOR % m_wallet->get_daemon_address();
+src/simplewallet/simplewallet.cpp:  if (!m_wallet->verify_password(pwd_container->password()))
+src/simplewallet/simplewallet.cpp:    m_wallet->set_subaddress_lookahead(lookahead->first, lookahead->second);
+src/simplewallet/simplewallet.cpp:  m_wallet->set_seed_language(mnemonic_language);
+src/simplewallet/simplewallet.cpp:    recovery_val = m_wallet->generate(m_wallet_file, std::move(rc.second).password(), recovery_key, recover, two_random, create_address_file);
+src/simplewallet/simplewallet.cpp:      << m_wallet->get_account().get_public_address_str(m_wallet->nettype());
+src/simplewallet/simplewallet.cpp:    print_secret_key(m_wallet->get_account().get_keys().m_view_secret_key);
+src/simplewallet/simplewallet.cpp:    m_wallet->set_subaddress_lookahead(lookahead->first, lookahead->second);
+src/simplewallet/simplewallet.cpp:    m_wallet->set_refresh_from_block_height(m_restore_height);
+src/simplewallet/simplewallet.cpp:      m_wallet->generate(m_wallet_file, std::move(rc.second).password(), address, *spendkey, viewkey, create_address_file);
+src/simplewallet/simplewallet.cpp:      m_wallet->generate(m_wallet_file, std::move(rc.second).password(), address, viewkey, create_address_file);
+src/simplewallet/simplewallet.cpp:      << m_wallet->get_account().get_public_address_str(m_wallet->nettype());
+src/simplewallet/simplewallet.cpp:  m_wallet->callback(this);
+src/simplewallet/simplewallet.cpp:    m_wallet->set_subaddress_lookahead(lookahead->first, lookahead->second);
+src/simplewallet/simplewallet.cpp:    m_wallet->set_refresh_from_block_height(m_restore_height);
+src/simplewallet/simplewallet.cpp:    m_wallet->device_derivation_path(device_derivation_path);
+src/simplewallet/simplewallet.cpp:    m_wallet->restore(m_wallet_file, std::move(rc.second).password(), device_desc.empty() ? "Ledger" : device_desc, create_address_file);
+src/simplewallet/simplewallet.cpp:      << m_wallet->get_account().get_public_address_str(m_wallet->nettype());
+src/simplewallet/simplewallet.cpp:    m_wallet->set_subaddress_lookahead(lookahead->first, lookahead->second);
+src/simplewallet/simplewallet.cpp:  m_wallet->set_seed_language(mnemonic_language);
+src/simplewallet/simplewallet.cpp:    m_wallet->generate(m_wallet_file, std::move(rc.second).password(), multisig_keys, create_address_file);
+src/simplewallet/simplewallet.cpp:    if (!m_wallet->multisig(&ready, &threshold, &total) || !ready)
+src/simplewallet/simplewallet.cpp:      << m_wallet->get_account().get_public_address_str(m_wallet->nettype());
+src/simplewallet/simplewallet.cpp:    m_wallet->callback(this);
+src/simplewallet/simplewallet.cpp:    m_wallet->load(m_wallet_file, password);
+src/simplewallet/simplewallet.cpp:    if (m_wallet->watch_only())
+src/simplewallet/simplewallet.cpp:    else if (m_wallet->multisig(&ready, &threshold, &total))
+src/simplewallet/simplewallet.cpp:      prefix << ": " << m_wallet->get_account().get_public_address_str(m_wallet->nettype());
+src/simplewallet/simplewallet.cpp:    if (m_wallet->get_account().get_device()) {
+src/simplewallet/simplewallet.cpp:       message_writer(console_color_white, true) << "Wallet is on device: " << m_wallet->get_account().get_device().get_name();
+src/simplewallet/simplewallet.cpp:    if (m_wallet->is_deprecated())
+src/simplewallet/simplewallet.cpp:        is_deterministic = m_wallet->is_deterministic();
+src/simplewallet/simplewallet.cpp:        m_wallet->set_seed_language(mnemonic_language);
+src/simplewallet/simplewallet.cpp:        m_wallet->rewrite(m_wallet_file, password);
+src/simplewallet/simplewallet.cpp:        m_wallet->get_seed(seed);
+src/simplewallet/simplewallet.cpp:        m_wallet->rewrite(m_wallet_file, password);
+src/simplewallet/simplewallet.cpp:        password_is_correct = m_wallet->verify_password(password);
+src/simplewallet/simplewallet.cpp:    m_wallet->stop();
+src/simplewallet/simplewallet.cpp:  bool r = m_wallet->deinit();
+src/simplewallet/simplewallet.cpp:    m_wallet->store();
+src/simplewallet/simplewallet.cpp:    m_wallet->store();
+src/simplewallet/simplewallet.cpp:  if (m_wallet->multisig())
+src/simplewallet/simplewallet.cpp:    m_wallet->write_watch_only_wallet(m_wallet_file, pwd_container->password(), new_keys_filename);
+src/simplewallet/simplewallet.cpp:  if (!m_wallet->is_trusted_daemon())
+src/simplewallet/simplewallet.cpp:  req.miner_address = m_wallet->get_account().get_public_address_str(m_wallet->nettype());
+src/simplewallet/simplewallet.cpp:  bool r = m_wallet->invoke_http_json("/start_mining", req, res);
+src/simplewallet/simplewallet.cpp:  bool r = m_wallet->invoke_http_json("/stop_mining", req, res);
+src/simplewallet/simplewallet.cpp:      int daemon_port = get_config(m_wallet->nettype()).RPC_DEFAULT_PORT;
+src/simplewallet/simplewallet.cpp:    m_wallet->init(daemon_url);
+src/simplewallet/simplewallet.cpp:        m_wallet->set_trusted_daemon(true);
+src/simplewallet/simplewallet.cpp:        m_wallet->set_trusted_daemon(false);
+src/simplewallet/simplewallet.cpp:        m_wallet->set_trusted_daemon(false);
+src/simplewallet/simplewallet.cpp:      m_wallet->set_trusted_daemon(false);
+src/simplewallet/simplewallet.cpp:        if (tools::is_local_address(m_wallet->get_daemon_address()))
+src/simplewallet/simplewallet.cpp:          m_wallet->set_trusted_daemon(true);
+src/simplewallet/simplewallet.cpp:    success_msg_writer() << boost::format("Daemon set to %s, %s") % daemon_url % (m_wallet->is_trusted_daemon() ? tr("trusted") : tr("untrusted"));
+src/simplewallet/simplewallet.cpp:  bool r = m_wallet->invoke_http_json("/save_bc", req, res);
+src/simplewallet/simplewallet.cpp:  const uint64_t warn_height = m_wallet->nettype() == TESTNET ? 1000000 : m_wallet->nettype() == STAGENET ? 50000 : 1650000;
+src/simplewallet/simplewallet.cpp:  if (!m_wallet->get_account().get_device().has_tx_cold_sign()) {
+src/simplewallet/simplewallet.cpp:  if (!received_money || m_wallet->get_device_last_key_image_sync() != 0) {
+src/simplewallet/simplewallet.cpp:    m_wallet->rescan_blockchain(reset == ResetHard, false);
+src/simplewallet/simplewallet.cpp:    m_wallet->refresh(m_wallet->is_trusted_daemon(), start_height, fetched_blocks, received_money);
+src/simplewallet/simplewallet.cpp:  if (m_wallet->has_multisig_partial_key_images())
+src/simplewallet/simplewallet.cpp:  else if (m_wallet->has_unknown_key_images())
+src/simplewallet/simplewallet.cpp:  success_msg_writer() << tr("Currently selected account: [") << m_current_subaddress_account << tr("] ") << m_wallet->get_subaddress_label({m_current_subaddress_account, 0});
+src/simplewallet/simplewallet.cpp:  const std::string tag = m_wallet->get_account_tags().second[m_current_subaddress_account];
+src/simplewallet/simplewallet.cpp:  success_msg_writer() << tr("Balance: ") << print_money(m_wallet->balance(m_current_subaddress_account)) << ", "
+src/simplewallet/simplewallet.cpp:    << tr("unlocked balance: ") << print_money(m_wallet->unlocked_balance(m_current_subaddress_account)) << extra;
+src/simplewallet/simplewallet.cpp:  std::map<uint32_t, uint64_t> balance_per_subaddress = m_wallet->balance_per_subaddress(m_current_subaddress_account);
+src/simplewallet/simplewallet.cpp:  std::map<uint32_t, uint64_t> unlocked_balance_per_subaddress = m_wallet->unlocked_balance_per_subaddress(m_current_subaddress_account);
+src/simplewallet/simplewallet.cpp:  m_wallet->get_transfers(transfers);
+src/simplewallet/simplewallet.cpp:    std::string address_str = m_wallet->get_subaddress_as_str(subaddr_index).substr(0, 6);
+src/simplewallet/simplewallet.cpp:    success_msg_writer() << boost::format(tr("%8u %6s %21s %21s %7u %21s")) % i.first % address_str % print_money(i.second) % print_money(unlocked_balance_per_subaddress[i.first]) % num_unspent_outputs % m_wallet->get_subaddress_label(subaddr_index);
+src/simplewallet/simplewallet.cpp:  const uint64_t blockchain_height = m_wallet->get_blockchain_current_height();
+src/simplewallet/simplewallet.cpp:  m_wallet->get_transfers(transfers);
+src/simplewallet/simplewallet.cpp:        (m_wallet->is_transfer_unlocked(td) ? tr("unlocked") : tr("locked")) %
+src/simplewallet/simplewallet.cpp:      m_wallet->get_payments(payment_id, payments);
+src/simplewallet/simplewallet.cpp:  return m_wallet->get_daemon_blockchain_height(err);
+src/simplewallet/simplewallet.cpp:  if (!m_wallet->is_trusted_daemon())
+src/simplewallet/simplewallet.cpp:    m_wallet->rescan_spent();
+src/simplewallet/simplewallet.cpp:      const tools::wallet2::transfer_details &td = m_wallet->get_transfer_details(construction_data.selected_transfers[i]);
+src/simplewallet/simplewallet.cpp:      bool r = m_wallet->invoke_http_bin("/get_outs.bin", req, res);
+src/simplewallet/simplewallet.cpp:  priority = m_wallet->adjust_priority(priority);
+src/simplewallet/simplewallet.cpp:    bool has_uri = m_wallet->parse_uri(local_args[i], address_uri, payment_id_uri, amount, tx_description, recipient_name, unknown_parameters, error);
+src/simplewallet/simplewallet.cpp:      r = cryptonote::get_account_address_from_str_or_url(info, m_wallet->nettype(), address_uri, oa_prompter);
+src/simplewallet/simplewallet.cpp:      r = cryptonote::get_account_address_from_str_or_url(info, m_wallet->nettype(), local_args[i], oa_prompter);
+src/simplewallet/simplewallet.cpp:  if (m_long_payment_id_support && !payment_id_seen && m_wallet->confirm_missing_payment_id() && dsts.size() > num_subaddresses)
+src/simplewallet/simplewallet.cpp:        ptx_vector = m_wallet->create_transactions_2(dsts, CRYPTONOTE_DEFAULT_TX_MIXIN, unlock_block /* unlock_time */, priority, extra, m_current_subaddress_account, subaddr_indices);
+src/simplewallet/simplewallet.cpp:        ptx_vector = m_wallet->create_transactions_2(dsts, CRYPTONOTE_DEFAULT_TX_MIXIN, 0 /* unlock_time */, priority, extra, m_current_subaddress_account, subaddr_indices);
+src/simplewallet/simplewallet.cpp:    if (m_wallet->confirm_backlog())
+src/simplewallet/simplewallet.cpp:        std::vector<std::pair<uint64_t, uint64_t>> nblocks = m_wallet->estimate_backlog({std::make_pair(worst_fee_per_byte, worst_fee_per_byte)});
+src/simplewallet/simplewallet.cpp:          if (nblocks[0].first > m_wallet->get_confirm_backlog_threshold())
+src/simplewallet/simplewallet.cpp:    if (m_wallet->always_confirm_transfers() || ptx_vector.size() > 1)
+src/simplewallet/simplewallet.cpp:            total_sent += m_wallet->get_transfer_details(i).amount();
+src/simplewallet/simplewallet.cpp:        if (m_wallet->print_ring_members())
+src/simplewallet/simplewallet.cpp:        if (m_wallet->confirm_non_default_ring_size() && !default_ring_size)
+src/simplewallet/simplewallet.cpp:    if (m_wallet->multisig() && called_by_mms)
+src/simplewallet/simplewallet.cpp:      std::string ciphertext = m_wallet->save_multisig_tx(ptx_vector);
+src/simplewallet/simplewallet.cpp:    else if (m_wallet->multisig())
+src/simplewallet/simplewallet.cpp:      bool r = m_wallet->save_multisig_tx(ptx_vector, "multisig_antd_tx");
+src/simplewallet/simplewallet.cpp:    else if (m_wallet->get_account().get_device().has_tx_cold_sign())
+src/simplewallet/simplewallet.cpp:        handle_transfer_exception(std::current_exception(), m_wallet->is_trusted_daemon());
+src/simplewallet/simplewallet.cpp:    else if (m_wallet->watch_only())
+src/simplewallet/simplewallet.cpp:      bool r = m_wallet->save_tx(ptx_vector, "unsigned_antd_tx");
+src/simplewallet/simplewallet.cpp:    handle_transfer_exception(std::current_exception(), m_wallet->is_trusted_daemon());
+src/simplewallet/simplewallet.cpp:    priority = m_wallet->adjust_priority(priority);
+src/simplewallet/simplewallet.cpp:    bool r = cryptonote::get_account_address_from_str_or_url(info, m_wallet->nettype(), address_str, oa_prompter);
+src/simplewallet/simplewallet.cpp:    if (m_long_payment_id_support && !payment_id_seen && m_wallet->confirm_missing_payment_id() && dsts.size() > num_subaddresses) {
+src/simplewallet/simplewallet.cpp:    message_writer() << tr("Checking wallet balance: ") << print_money(m_wallet->balance());
+src/simplewallet/simplewallet.cpp:    if (m_wallet->balance() < de.amount) {
+src/simplewallet/simplewallet.cpp:        fail_msg_writer() << tr("Insufficient funds: balance ") << print_money(m_wallet->balance()) << ", required " << print_money(de.amount);
+src/simplewallet/simplewallet.cpp:            ptx_vector = m_wallet->create_transactions_2(dsts, CRYPTONOTE_DEFAULT_TX_MIXIN, unlock_block, priority, extra, m_current_subaddress_account, subaddr_indices);
+src/simplewallet/simplewallet.cpp:            ptx_vector = m_wallet->create_transactions_2(dsts, CRYPTONOTE_DEFAULT_TX_MIXIN, 0 /* unlock_time */, priority, extra, m_current_subaddress_account, subaddr_indices);
+src/simplewallet/simplewallet.cpp:    if (m_wallet->confirm_backlog())
+src/simplewallet/simplewallet.cpp:        std::vector<std::pair<uint64_t, uint64_t>> nblocks = m_wallet->estimate_backlog({std::make_pair(worst_fee_per_byte, worst_fee_per_byte)});
+src/simplewallet/simplewallet.cpp:          if (nblocks[0].first > m_wallet->get_confirm_backlog_threshold())
+src/simplewallet/simplewallet.cpp:    if (m_wallet->always_confirm_transfers() || ptx_vector.size() > 1)
+src/simplewallet/simplewallet.cpp:            total_sent += m_wallet->get_transfer_details(i).amount();
+src/simplewallet/simplewallet.cpp:        if (m_wallet->print_ring_members())
+src/simplewallet/simplewallet.cpp:        if (m_wallet->confirm_non_default_ring_size() && !default_ring_size)
+src/simplewallet/simplewallet.cpp:    if (m_wallet->multisig() && called_by_mms)
+src/simplewallet/simplewallet.cpp:      std::string ciphertext = m_wallet->save_multisig_tx(ptx_vector);
+src/simplewallet/simplewallet.cpp:    else if (m_wallet->multisig())
+src/simplewallet/simplewallet.cpp:      bool r = m_wallet->save_multisig_tx(ptx_vector, "multisig_antd_tx");
+src/simplewallet/simplewallet.cpp:    else if (m_wallet->get_account().get_device().has_tx_cold_sign())
+src/simplewallet/simplewallet.cpp:        handle_transfer_exception(std::current_exception(), m_wallet->is_trusted_daemon());
+src/simplewallet/simplewallet.cpp:    else if (m_wallet->watch_only())
+src/simplewallet/simplewallet.cpp:      bool r = m_wallet->save_tx(ptx_vector, "unsigned_antd_tx");
+src/simplewallet/simplewallet.cpp:    handle_transfer_exception(std::current_exception(), m_wallet->is_trusted_daemon());
+src/simplewallet/simplewallet.cpp:  m_wallet->get_transfers(transfers); // Get both incoming and outgoing
+src/simplewallet/simplewallet.cpp:  tools::wallet2::register_full_node_result result = m_wallet->create_register_full_node_tx(args_, m_current_subaddress_account);
+src/simplewallet/simplewallet.cpp:  info.address            = m_wallet->get_address();
+src/simplewallet/simplewallet.cpp:    handle_transfer_exception(std::current_exception(), m_wallet->is_trusted_daemon());
+src/simplewallet/simplewallet.cpp:    priority = m_wallet->adjust_priority(priority);
+src/simplewallet/simplewallet.cpp:    m_wallet->refresh(false);
+src/simplewallet/simplewallet.cpp:      info.address            = m_wallet->get_address();
+src/simplewallet/simplewallet.cpp:      tools::wallet2::stake_result stake_result = m_wallet->create_stake_tx(full_node_key, info, amount, amount_fraction, priority, m_current_subaddress_account, subaddr_indices);
+src/simplewallet/simplewallet.cpp:      handle_transfer_exception(std::current_exception(), m_wallet->is_trusted_daemon());
+src/simplewallet/simplewallet.cpp:  tools::wallet2::request_stake_unlock_result unlock_result = m_wallet->can_request_stake_unlock(snode_key);
+src/simplewallet/simplewallet.cpp:  if (m_wallet->multisig())
+src/simplewallet/simplewallet.cpp:  if (m_wallet->watch_only())
+src/simplewallet/simplewallet.cpp:    if (m_wallet->save_tx(ptx_vector, "unsigned_antd_tx"))
+src/simplewallet/simplewallet.cpp:    handle_transfer_exception(std::current_exception(), m_wallet->is_trusted_daemon());
+src/simplewallet/simplewallet.cpp:    const std::vector<COMMAND_RPC_GET_FULL_NODES::response::entry> response = m_wallet->get_all_full_nodes(failed);
+src/simplewallet/simplewallet.cpp:    cryptonote::account_public_address const primary_address = m_wallet->get_address();
+src/simplewallet/simplewallet.cpp:        if (!cryptonote::get_account_address_from_str(address_info, m_wallet->nettype(), contributor.address))
+src/simplewallet/simplewallet.cpp:    const std::vector<cryptonote::COMMAND_RPC_GET_FULL_NODE_BLACKLISTED_KEY_IMAGES::entry> response = m_wallet->get_full_node_blacklisted_key_images(failed);
+src/simplewallet/simplewallet.cpp:      if (!m_wallet->contains_key_image(*reinterpret_cast<const crypto::key_image*>(binary_buf.data())))
+src/simplewallet/simplewallet.cpp:    auto ptx_vector = m_wallet->create_unmixable_sweep_transactions();
+src/simplewallet/simplewallet.cpp:        total_unmixable += m_wallet->get_transfer_details(i).amount();
+src/simplewallet/simplewallet.cpp:    if (m_wallet->multisig())
+src/simplewallet/simplewallet.cpp:      bool r = m_wallet->save_multisig_tx(ptx_vector, "multisig_antd_tx");
+src/simplewallet/simplewallet.cpp:    else if (m_wallet->watch_only())
+src/simplewallet/simplewallet.cpp:      bool r = m_wallet->save_tx(ptx_vector, "unsigned_antd_tx");
+src/simplewallet/simplewallet.cpp:    handle_transfer_exception(std::current_exception(), m_wallet->is_trusted_daemon());
+src/simplewallet/simplewallet.cpp:      total_sent += m_wallet->get_transfer_details(i).amount();
+src/simplewallet/simplewallet.cpp:  if (m_wallet->print_ring_members() && !print_ring_members(ptx_vector, prompt))
+src/simplewallet/simplewallet.cpp:  if (m_wallet->multisig())
+src/simplewallet/simplewallet.cpp:    bool r = m_wallet->save_multisig_tx(ptx_vector, "multisig_antd_tx");
+src/simplewallet/simplewallet.cpp:  else if (m_wallet->get_account().get_device().has_tx_cold_sign())
+src/simplewallet/simplewallet.cpp:      handle_transfer_exception(std::current_exception(), m_wallet->is_trusted_daemon());
+src/simplewallet/simplewallet.cpp:  else if (m_wallet->watch_only())
+src/simplewallet/simplewallet.cpp:    bool r = m_wallet->save_tx(ptx_vector, "unsigned_antd_tx");
+src/simplewallet/simplewallet.cpp:  priority = m_wallet->adjust_priority(priority);
+src/simplewallet/simplewallet.cpp:  if (!cryptonote::get_account_address_from_str_or_url(info, m_wallet->nettype(), local_args[0], oa_prompter))
+src/simplewallet/simplewallet.cpp:  if (m_long_payment_id_support && !payment_id_seen && m_wallet->confirm_missing_payment_id() && !info.is_subaddress)
+src/simplewallet/simplewallet.cpp:    auto ptx_vector = m_wallet->create_transactions_all(below, info.address, info.is_subaddress, outputs, CRYPTONOTE_DEFAULT_TX_MIXIN, unlock_block /* unlock_time */, priority, extra, m_current_subaddress_account, subaddr_indices, false, sweep_style);
+src/simplewallet/simplewallet.cpp:    handle_transfer_exception(std::current_exception(), m_wallet->is_trusted_daemon());
+src/simplewallet/simplewallet.cpp:  priority = m_wallet->adjust_priority(priority);
+src/simplewallet/simplewallet.cpp:  if (!cryptonote::get_account_address_from_str_or_url(info, m_wallet->nettype(), local_args[1], oa_prompter))
+src/simplewallet/simplewallet.cpp:  if (m_long_payment_id_support && !payment_id_seen && m_wallet->confirm_missing_payment_id() && !info.is_subaddress)
+src/simplewallet/simplewallet.cpp:    auto ptx_vector = m_wallet->create_transactions_single(ki, info.address, info.is_subaddress, outputs, CRYPTONOTE_DEFAULT_TX_MIXIN, 0 /* unlock_time */, priority, extra);
+src/simplewallet/simplewallet.cpp:    handle_transfer_exception(std::current_exception(), m_wallet->is_trusted_daemon());
+src/simplewallet/simplewallet.cpp:      std::string address, standard_address = get_account_address_as_str(m_wallet->nettype(), entry.is_subaddress, entry.addr);
+src/simplewallet/simplewallet.cpp:        address = get_account_integrated_address_as_str(m_wallet->nettype(), entry.addr, payment_id8);
+src/simplewallet/simplewallet.cpp:    std::string address = get_account_address_as_str(m_wallet->nettype(), get_tx(0).subaddr_account > 0, get_tx(0).change_dts.addr);
+src/simplewallet/simplewallet.cpp:  if (m_wallet->key_on_device())
+src/simplewallet/simplewallet.cpp:  if(m_wallet->multisig())
+src/simplewallet/simplewallet.cpp:  if(m_wallet->watch_only())
+src/simplewallet/simplewallet.cpp:    bool r = m_wallet->sign_tx("unsigned_antd_tx", "signed_antd_tx", ptx, [&](const tools::wallet2::unsigned_tx_set &tx){ return accept_loaded_tx(tx); }, export_raw);
+src/simplewallet/simplewallet.cpp:  if (m_wallet->key_on_device())
+src/simplewallet/simplewallet.cpp:    bool r = m_wallet->load_tx("signed_antd_tx", ptx_vector, [&](const tools::wallet2::signed_tx_set &tx){ return accept_loaded_tx(tx); });
+src/simplewallet/simplewallet.cpp:    handle_transfer_exception(std::current_exception(), m_wallet->is_trusted_daemon());
+src/simplewallet/simplewallet.cpp:  if (m_wallet->key_on_device())
+src/simplewallet/simplewallet.cpp:  if (m_wallet->get_tx_key(txid, tx_key, additional_tx_keys))
+src/simplewallet/simplewallet.cpp:    m_wallet->set_tx_key(txid, tx_key, additional_tx_keys);
+src/simplewallet/simplewallet.cpp:  if (m_wallet->key_on_device())
+src/simplewallet/simplewallet.cpp:  if(!cryptonote::get_account_address_from_str_or_url(info, m_wallet->nettype(), args[1], oa_prompter))
+src/simplewallet/simplewallet.cpp:    std::string sig_str = m_wallet->get_tx_proof(txid, info.address, info.is_subaddress, args.size() == 3 ? args[2] : "");
+src/simplewallet/simplewallet.cpp:  if(!cryptonote::get_account_address_from_str_or_url(info, m_wallet->nettype(), local_args[2], oa_prompter))
+src/simplewallet/simplewallet.cpp:    m_wallet->check_tx_key(txid, tx_key, additional_tx_keys, info.address, received, in_pool, confirmations);
+src/simplewallet/simplewallet.cpp:      success_msg_writer() << get_account_address_as_str(m_wallet->nettype(), info.is_subaddress, info.address) << " " << tr("received") << " " << print_money(received) << " " << tr("in txid") << " " << txid;
+src/simplewallet/simplewallet.cpp:      fail_msg_writer() << get_account_address_as_str(m_wallet->nettype(), info.is_subaddress, info.address) << " " << tr("received nothing in txid") << " " << txid;
+src/simplewallet/simplewallet.cpp:  if(!cryptonote::get_account_address_from_str_or_url(info, m_wallet->nettype(), args[1], oa_prompter))
+src/simplewallet/simplewallet.cpp:    if (m_wallet->check_tx_proof(txid, info.address, info.is_subaddress, args.size() == 4 ? args[3] : "", sig_str, received, in_pool, confirmations))
+src/simplewallet/simplewallet.cpp:        success_msg_writer() << get_account_address_as_str(m_wallet->nettype(), info.is_subaddress, info.address) << " " << tr("received") << " " << print_money(received) << " " << tr("in txid") << " " << txid;
+src/simplewallet/simplewallet.cpp:        fail_msg_writer() << get_account_address_as_str(m_wallet->nettype(), info.is_subaddress, info.address) << " " << tr("received nothing in txid") << " " << txid;
+src/simplewallet/simplewallet.cpp:  if (m_wallet->key_on_device())
+src/simplewallet/simplewallet.cpp:  if (m_wallet->watch_only())
+src/simplewallet/simplewallet.cpp:    const std::string sig_str = m_wallet->get_spend_proof(txid, args.size() == 2 ? args[1] : "");
+src/simplewallet/simplewallet.cpp:    if (m_wallet->check_spend_proof(txid, args.size() == 3 ? args[2] : "", sig_str))
+src/simplewallet/simplewallet.cpp:  if (m_wallet->key_on_device())
+src/simplewallet/simplewallet.cpp:  if (m_wallet->watch_only() || m_wallet->multisig())
+src/simplewallet/simplewallet.cpp:    const std::string sig_str = m_wallet->get_reserve_proof(account_minreserve, args.size() == 2 ? args[1] : "");
+src/simplewallet/simplewallet.cpp:  if(!cryptonote::get_account_address_from_str_or_url(info, m_wallet->nettype(), args[0], oa_prompter))
+src/simplewallet/simplewallet.cpp:    if (m_wallet->check_reserve_proof(info.address, args.size() == 3 ? args[2] : "", sig_str, total, spent))
+src/simplewallet/simplewallet.cpp:    m_wallet->get_payments(payments, min_height, max_height, m_current_subaddress_account, subaddr_indices);
+src/simplewallet/simplewallet.cpp:      std::string note = m_wallet->get_tx_note(pd.m_tx_hash);
+src/simplewallet/simplewallet.cpp:      std::string destination = m_wallet->get_subaddress_as_str({m_current_subaddress_account, pd.m_subaddr_index.minor});
+src/simplewallet/simplewallet.cpp:        m_wallet->is_transfer_unlocked(pd.m_unlock_time, pd.m_block_height),
+src/simplewallet/simplewallet.cpp:    m_wallet->get_payments_out(payments, min_height, max_height, m_current_subaddress_account, subaddr_indices);
+src/simplewallet/simplewallet.cpp:        output.wallet_addr                 = get_account_address_as_str(m_wallet->nettype(), dest.is_subaddress, dest.addr);
+src/simplewallet/simplewallet.cpp:      const uint64_t staking_duration = full_nodes::staking_num_lock_blocks(m_wallet->nettype());
+src/simplewallet/simplewallet.cpp:        locked |= (!m_wallet->is_transfer_unlocked(unlock_time, pd.m_block_height));
+src/simplewallet/simplewallet.cpp:      std::string note = m_wallet->get_tx_note(i->first);
+src/simplewallet/simplewallet.cpp:      m_wallet->update_pool_state();
+src/simplewallet/simplewallet.cpp:      m_wallet->get_unconfirmed_payments(payments, m_current_subaddress_account, subaddr_indices);
+src/simplewallet/simplewallet.cpp:        std::string note = m_wallet->get_tx_note(pd.m_tx_hash);
+src/simplewallet/simplewallet.cpp:        std::string destination = m_wallet->get_subaddress_as_str({m_current_subaddress_account, pd.m_subaddr_index.minor});
+src/simplewallet/simplewallet.cpp:    m_wallet->get_unconfirmed_payments_out(upayments, m_current_subaddress_account, subaddr_indices);
+src/simplewallet/simplewallet.cpp:        output.wallet_addr                 = get_account_address_as_str(m_wallet->nettype(), dest.is_subaddress, dest.addr);
+src/simplewallet/simplewallet.cpp:      std::string note = m_wallet->get_tx_note(i->first);
+src/simplewallet/simplewallet.cpp:  m_wallet->get_transfers(transfers);
+src/simplewallet/simplewallet.cpp:          m_wallet->refresh(m_wallet->is_trusted_daemon(), 0, fetched_blocks, received_money, false); // don't check the pool in background mode
+src/simplewallet/simplewallet.cpp:  std::string addr_start = m_wallet->get_subaddress_as_str({m_current_subaddress_account, 0}).substr(0, 6);
+src/simplewallet/simplewallet.cpp:  if (!m_wallet->check_connection(NULL))
+src/simplewallet/simplewallet.cpp:    if (m_wallet->is_synced())
+src/simplewallet/simplewallet.cpp:  m_auto_refresh_enabled = m_wallet->auto_refresh();
+src/simplewallet/simplewallet.cpp:    m_wallet->add_subaddress_account(label);
+src/simplewallet/simplewallet.cpp:    m_current_subaddress_account = m_wallet->get_num_subaddress_accounts() - 1;
+src/simplewallet/simplewallet.cpp:    if (index_major >= m_wallet->get_num_subaddress_accounts())
+src/simplewallet/simplewallet.cpp:      fail_msg_writer() << tr("specify an index between 0 and ") << (m_wallet->get_num_subaddress_accounts() - 1);
+src/simplewallet/simplewallet.cpp:      m_wallet->set_subaddress_label({index_major, 0}, label);
+src/simplewallet/simplewallet.cpp:      m_wallet->set_account_tag(account_indices, tag);
+src/simplewallet/simplewallet.cpp:      m_wallet->set_account_tag(account_indices, "");
+src/simplewallet/simplewallet.cpp:      m_wallet->set_account_tag_description(tag, description);
+src/simplewallet/simplewallet.cpp:  const std::pair<std::map<std::string, std::string>, std::vector<std::string>>& account_tags = m_wallet->get_account_tags();
+src/simplewallet/simplewallet.cpp:  size_t num_untagged_accounts = m_wallet->get_num_subaddress_accounts();
+src/simplewallet/simplewallet.cpp:  if (num_untagged_accounts < m_wallet->get_num_subaddress_accounts())
+src/simplewallet/simplewallet.cpp:    success_msg_writer() << tr("\nGrand total:\n  Balance: ") << print_money(m_wallet->balance_all()) << tr(", unlocked balance: ") << print_money(m_wallet->unlocked_balance_all());
+src/simplewallet/simplewallet.cpp:  const std::pair<std::map<std::string, std::string>, std::vector<std::string>>& account_tags = m_wallet->get_account_tags();
+src/simplewallet/simplewallet.cpp:  for (uint32_t account_index = 0; account_index < m_wallet->get_num_subaddress_accounts(); ++account_index)
+src/simplewallet/simplewallet.cpp:      % m_wallet->get_subaddress_as_str({account_index, 0}).substr(0, 6)
+src/simplewallet/simplewallet.cpp:      % print_money(m_wallet->balance(account_index))
+src/simplewallet/simplewallet.cpp:      % print_money(m_wallet->unlocked_balance(account_index))
+src/simplewallet/simplewallet.cpp:      % m_wallet->get_subaddress_label({account_index, 0});
+src/simplewallet/simplewallet.cpp:    total_balance += m_wallet->balance(account_index);
+src/simplewallet/simplewallet.cpp:    total_unlocked_balance += m_wallet->unlocked_balance(account_index);
+src/simplewallet/simplewallet.cpp:  m_wallet->get_transfers(transfers);
+src/simplewallet/simplewallet.cpp:    success_msg_writer() << index << "  " << m_wallet->get_subaddress_as_str({m_current_subaddress_account, index}) << "  " << (index == 0 ? tr("Primary address") : m_wallet->get_subaddress_label({m_current_subaddress_account, index})) << " " << (used ? tr("(used)") : "");
+src/simplewallet/simplewallet.cpp:    for (; index < m_wallet->get_num_subaddresses(m_current_subaddress_account); ++index)
+src/simplewallet/simplewallet.cpp:    m_wallet->add_subaddress(m_current_subaddress_account, label);
+src/simplewallet/simplewallet.cpp:    print_address_sub(m_wallet->get_num_subaddresses(m_current_subaddress_account) - 1);
+src/simplewallet/simplewallet.cpp:    if (index >= m_wallet->get_num_subaddresses(m_current_subaddress_account))
+src/simplewallet/simplewallet.cpp:      fail_msg_writer() << tr("specify an index between 0 and ") << (m_wallet->get_num_subaddresses(m_current_subaddress_account) - 1);
+src/simplewallet/simplewallet.cpp:    m_wallet->set_subaddress_label({m_current_subaddress_account, index}, label);
+src/simplewallet/simplewallet.cpp:    if (index_min >= m_wallet->get_num_subaddresses(m_current_subaddress_account))
+src/simplewallet/simplewallet.cpp:    if (index_max >= m_wallet->get_num_subaddresses(m_current_subaddress_account))
+src/simplewallet/simplewallet.cpp:      index_max = m_wallet->get_num_subaddresses(m_current_subaddress_account) - 1;
+src/simplewallet/simplewallet.cpp:    success_msg_writer() << tr("Matching integrated address: ") << m_wallet->get_account().get_public_integrated_address_str(payment_id, m_wallet->nettype());
+src/simplewallet/simplewallet.cpp:    success_msg_writer() << m_wallet->get_account().get_public_integrated_address_str(payment_id, m_wallet->nettype());
+src/simplewallet/simplewallet.cpp:    if(get_account_address_from_str(info, m_wallet->nettype(), args.back()))
+src/simplewallet/simplewallet.cpp:          get_account_address_as_str(m_wallet->nettype(), false, info.address) % epee::string_tools::pod_to_hex(info.payment_id);
+src/simplewallet/simplewallet.cpp:        success_msg_writer() << (info.is_subaddress ? tr("Subaddress: ") : tr("Standard address: ")) << get_account_address_as_str(m_wallet->nettype(), info.is_subaddress, info.address);
+src/simplewallet/simplewallet.cpp:    if(!cryptonote::get_account_address_from_str_or_url(info, m_wallet->nettype(), args[1], oa_prompter))
+src/simplewallet/simplewallet.cpp:    m_wallet->add_address_book_row(info.address, payment_id, description, info.is_subaddress);
+src/simplewallet/simplewallet.cpp:    m_wallet->delete_address_book_row(row_id);
+src/simplewallet/simplewallet.cpp:  auto address_book = m_wallet->get_address_book();
+src/simplewallet/simplewallet.cpp:      success_msg_writer() << tr("Address: ") << get_account_address_as_str(m_wallet->nettype(), row.m_is_subaddress, row.m_address);
+src/simplewallet/simplewallet.cpp:  m_wallet->set_tx_note(txid, note);
+src/simplewallet/simplewallet.cpp:  std::string note = m_wallet->get_tx_note(txid);
+src/simplewallet/simplewallet.cpp:  m_wallet->set_description(description);
+src/simplewallet/simplewallet.cpp:  std::string description = m_wallet->get_description();
+src/simplewallet/simplewallet.cpp:  uint64_t local_height = m_wallet->get_blockchain_current_height();
+src/simplewallet/simplewallet.cpp:  if (!m_wallet->check_connection(&version))
+src/simplewallet/simplewallet.cpp:  std::string description = m_wallet->get_description();
+src/simplewallet/simplewallet.cpp:  message_writer() << tr("Filename: ") << m_wallet->get_wallet_file();
+src/simplewallet/simplewallet.cpp:  message_writer() << tr("Address: ") << m_wallet->get_account().get_public_address_str(m_wallet->nettype());
+src/simplewallet/simplewallet.cpp:  if (m_wallet->watch_only())
+src/simplewallet/simplewallet.cpp:  else if (m_wallet->multisig(&ready, &threshold, &total))
+src/simplewallet/simplewallet.cpp:    m_wallet->nettype() == cryptonote::TESTNET ? tr("Testnet") :
+src/simplewallet/simplewallet.cpp:    m_wallet->nettype() == cryptonote::STAGENET ? tr("Stagenet") : tr("Mainnet"));
+src/simplewallet/simplewallet.cpp:  if (m_wallet->key_on_device())
+src/simplewallet/simplewallet.cpp:  if (m_wallet->watch_only())
+src/simplewallet/simplewallet.cpp:  if (m_wallet->multisig())
+src/simplewallet/simplewallet.cpp:  std::string signature = m_wallet->sign(data);
+src/simplewallet/simplewallet.cpp:  if(!cryptonote::get_account_address_from_str_or_url(info, m_wallet->nettype(), address_string, oa_prompter))
+src/simplewallet/simplewallet.cpp:  r = m_wallet->verify(data, info.address, signature);
+src/simplewallet/simplewallet.cpp:  if (m_wallet->key_on_device())
+src/simplewallet/simplewallet.cpp:  if (m_wallet->watch_only())
+src/simplewallet/simplewallet.cpp:  if (m_wallet->confirm_export_overwrite() && !check_file_overwrite(filename))
+src/simplewallet/simplewallet.cpp:    if (!m_wallet->export_key_images(filename, requested_only))
+src/simplewallet/simplewallet.cpp:  if (m_wallet->key_on_device())
+src/simplewallet/simplewallet.cpp:  if (!m_wallet->is_trusted_daemon())
+src/simplewallet/simplewallet.cpp:    uint64_t height = m_wallet->import_key_images(filename, spent, unspent);
+src/simplewallet/simplewallet.cpp:  if (!m_wallet->key_on_device())
+src/simplewallet/simplewallet.cpp:  if (!m_wallet->get_account().get_device().has_ki_cold_sync())
+src/simplewallet/simplewallet.cpp:    uint64_t height = m_wallet->cold_key_image_sync(spent, unspent);
+src/simplewallet/simplewallet.cpp:      if (!m_wallet->is_trusted_daemon())
+src/simplewallet/simplewallet.cpp:  if (!m_wallet->key_on_device())
+src/simplewallet/simplewallet.cpp:    bool r = m_wallet->reconnect_device();
+src/simplewallet/simplewallet.cpp:  if (m_wallet->key_on_device())
+src/simplewallet/simplewallet.cpp:  if (m_wallet->confirm_export_overwrite() && !check_file_overwrite(filename))
+src/simplewallet/simplewallet.cpp:    std::string data = m_wallet->export_outputs_to_str();
+src/simplewallet/simplewallet.cpp:  if (m_wallet->key_on_device())
+src/simplewallet/simplewallet.cpp:    size_t n_outputs = m_wallet->import_outputs_from_str(data);
+src/simplewallet/simplewallet.cpp:  const uint64_t last_block_height = m_wallet->get_blockchain_current_height();
+src/simplewallet/simplewallet.cpp:  m_wallet->get_payments(payments, 0, (uint64_t)-1, m_current_subaddress_account);
+src/simplewallet/simplewallet.cpp:        uint64_t last_block_reward = m_wallet->get_last_block_reward();
+src/simplewallet/simplewallet.cpp:      success_msg_writer() << "Note: " << m_wallet->get_tx_note(txid);
+src/simplewallet/simplewallet.cpp:  m_wallet->get_payments_out(payments_out, 0, (uint64_t)-1, m_current_subaddress_account);
+src/simplewallet/simplewallet.cpp:        dests +=  get_account_address_as_str(m_wallet->nettype(), d.is_subaddress, d.addr) + ": " + print_money(d.amount);
+src/simplewallet/simplewallet.cpp:      success_msg_writer() << "Note: " << m_wallet->get_tx_note(txid);
+src/simplewallet/simplewallet.cpp:    m_wallet->update_pool_state();
+src/simplewallet/simplewallet.cpp:    m_wallet->get_unconfirmed_payments(pool_payments, m_current_subaddress_account);
+src/simplewallet/simplewallet.cpp:        success_msg_writer() << "Note: " << m_wallet->get_tx_note(txid);
+src/simplewallet/simplewallet.cpp:  m_wallet->get_unconfirmed_payments_out(upayments, m_current_subaddress_account);
+src/simplewallet/simplewallet.cpp:      success_msg_writer() << "Note: " << m_wallet->get_tx_note(txid);
+src/simplewallet/simplewallet.cpp:    m_wallet->stop();
+src/simplewallet/simplewallet.cpp:      m_wallet->commit_tx(ptx);
+src/simplewallet/simplewallet.cpp:  mms::message_store& ms = m_wallet->get_message_store();
+src/simplewallet/simplewallet.cpp:  mms::message_store& ms = m_wallet->get_message_store();
+src/simplewallet/simplewallet.cpp:      monero_address = get_account_address_as_str(m_wallet->nettype(), false, signer.monero_address);
+src/simplewallet/simplewallet.cpp:  mms::message_store& ms = m_wallet->get_message_store();
+src/simplewallet/simplewallet.cpp:  mms::message_store& ms = m_wallet->get_message_store();
+src/simplewallet/simplewallet.cpp:  mms::message_store& ms = m_wallet->get_message_store();
+src/simplewallet/simplewallet.cpp:  mms::message_store& ms = m_wallet->get_message_store();
+src/simplewallet/simplewallet.cpp:  mms::message_store& ms = m_wallet->get_message_store();
+src/simplewallet/simplewallet.cpp:  mms::message_store& ms = m_wallet->get_message_store();
+src/simplewallet/simplewallet.cpp:  mms::message_store& ms = m_wallet->get_message_store();
+src/simplewallet/simplewallet.cpp:    bool ok = cryptonote::get_account_address_from_str_or_url(info, m_wallet->nettype(), args[3], oa_prompter);
+src/simplewallet/simplewallet.cpp:  mms::message_store& ms = m_wallet->get_message_store();
+src/simplewallet/simplewallet.cpp:  mms::message_store& ms = m_wallet->get_message_store();
+src/simplewallet/simplewallet.cpp:  mms::message_store& ms = m_wallet->get_message_store();
+src/simplewallet/simplewallet.cpp:  mms::message_store& ms = m_wallet->get_message_store();
+src/simplewallet/simplewallet.cpp:  mms::message_store& ms = m_wallet->get_message_store();
+src/simplewallet/simplewallet.cpp:  mms::message_store& ms = m_wallet->get_message_store();
+src/simplewallet/simplewallet.cpp:  mms::message_store& ms = m_wallet->get_message_store();
+src/simplewallet/simplewallet.cpp:  mms::message_store& ms = m_wallet->get_message_store();
+src/simplewallet/simplewallet.cpp:  mms::message_store& ms = m_wallet->get_message_store();
+src/simplewallet/simplewallet.cpp:  mms::message_store& ms = m_wallet->get_message_store();
+src/simplewallet/simplewallet.cpp:  mms::message_store& ms = m_wallet->get_message_store();
+src/simplewallet/simplewallet.cpp:  mms::message_store& ms = m_wallet->get_message_store();
+src/simplewallet/simplewallet.cpp:  mms::message_store& ms = m_wallet->get_message_store();
+src/simplewallet/simplewallet.cpp:  mms::message_store& ms = m_wallet->get_message_store();
+src/simplewallet/simplewallet.cpp:    mms::message_store& ms = m_wallet->get_message_store();
+src/simplewallet/simplewallet.h:     * \brief When --do-not-relay option is specified, save the raw tx hex blob to a file instead of calling m_wallet->commit_tx(ptx).
+src/simplewallet/simplewallet.h:    mms::message_store& get_message_store() const { return m_wallet->get_message_store(); };
+src/simplewallet/simplewallet.h:    mms::multisig_wallet_state get_multisig_wallet_state() const { return m_wallet->get_multisig_wallet_state(); };
+src/wallet/api/address_book.cpp:  if(!cryptonote::get_account_address_from_str(info, m_wallet->m_wallet->nettype(), dst_addr)) {
+src/wallet/api/address_book.cpp:  bool r =  m_wallet->m_wallet->add_address_book_row(info.address,payment_id,description,info.is_subaddress);
+src/wallet/api/address_book.cpp:  std::vector<tools::wallet2::address_book_row> rows = m_wallet->m_wallet->get_address_book();
+src/wallet/api/address_book.cpp:    std::string address = cryptonote::get_account_address_as_str(m_wallet->m_wallet->nettype(), row->m_is_subaddress, row->m_address);
+src/wallet/api/address_book.cpp:          address = cryptonote::get_account_integrated_address_as_str(m_wallet->m_wallet->nettype(), row->m_address, payment_id_short);
+src/wallet/api/address_book.cpp:  bool r = m_wallet->m_wallet->delete_address_book_row(rowId);
+src/wallet/api/unsigned_transaction.cpp:    bool r = m_wallet.m_wallet->sign_tx(m_unsigned_tx_set, signedFileName, ptx);
+src/wallet/api/unsigned_transaction.cpp:      std::string address, standard_address = get_account_address_as_str(m_wallet.m_wallet->nettype(), entry.is_subaddress, entry.addr);
+src/wallet/api/unsigned_transaction.cpp:        address = get_account_integrated_address_as_str(m_wallet.m_wallet->nettype(), entry.addr, payment_id8);
+src/wallet/api/unsigned_transaction.cpp:    std::string address = get_account_address_as_str(m_wallet.m_wallet->nettype(), get_tx(0).subaddr_account > 0, get_tx(0).change_dts.addr);
+src/wallet/api/unsigned_transaction.cpp:        result.push_back(cryptonote::get_account_address_as_str(m_wallet.m_wallet->nettype(), utx.dests[0].is_subaddress, utx.dests[0].addr));
+src/wallet/api/wallet.cpp:        if(height >= m_wallet->m_wallet->get_refresh_from_block_height() || height % 1000 == 0) {
+src/wallet/api/wallet.cpp:        if (m_listener && m_wallet->synchronized()) {
+src/wallet/api/wallet.cpp:        if (m_listener && m_wallet->synchronized()) {
+src/wallet/api/wallet.cpp:        if (m_listener && m_wallet->synchronized()) {
+src/wallet/api/wallet.cpp:    m_wallet->callback(m_wallet2Callback.get());
+src/wallet/api/wallet.cpp:    m_wallet->callback(NULL);
+src/wallet/api/wallet.cpp:    m_wallet->set_seed_language(language);
+src/wallet/api/wallet.cpp:        recovery_val = m_wallet->generate(path, password, secret_key, false, false);
+src/wallet/api/wallet.cpp:    std::unique_ptr<tools::wallet2> view_wallet(new tools::wallet2(m_wallet->nettype()));
+src/wallet/api/wallet.cpp:    view_wallet->set_refresh_from_block_height(m_wallet->get_refresh_from_block_height());
+src/wallet/api/wallet.cpp:    const crypto::secret_key viewkey = m_wallet->get_account().get_keys().m_view_secret_key;
+src/wallet/api/wallet.cpp:    const cryptonote::account_public_address address = m_wallet->get_account().get_keys().m_account_address;
+src/wallet/api/wallet.cpp:        auto outputs = m_wallet->export_outputs();
+src/wallet/api/wallet.cpp:        auto bc = m_wallet->export_blockchain();
+src/wallet/api/wallet.cpp:        auto payments = m_wallet->export_payments();
+src/wallet/api/wallet.cpp:        m_wallet->get_payments_out(out_payments, 0);
+src/wallet/api/wallet.cpp:        auto key_images = m_wallet->export_key_images(false /* requested_ki_only */);
+src/wallet/api/wallet.cpp:    if(!get_account_address_from_str(info, m_wallet->nettype(), address_string))
+src/wallet/api/wallet.cpp:            m_wallet->generate(path, password, info.address, spendkey, viewkey);
+src/wallet/api/wallet.cpp:            m_wallet->generate(path, password, info.address, viewkey);
+src/wallet/api/wallet.cpp:           m_wallet->generate(path, password, spendkey, true, false);
+src/wallet/api/wallet.cpp:        m_wallet->restore(path, password, device_name);
+src/wallet/api/wallet.cpp:    return static_cast<Wallet::Device>(m_wallet->get_device_type());
+src/wallet/api/wallet.cpp:        m_wallet->set_ring_database(get_default_ringdb_path(m_wallet->nettype()));
+src/wallet/api/wallet.cpp:        m_wallet->load(path, password);
+src/wallet/api/wallet.cpp:        m_wallet->set_seed_language(old_language);
+src/wallet/api/wallet.cpp:        m_wallet->generate(path, password, recovery_key, true, false);
+src/wallet/api/wallet.cpp:                m_wallet->store();
+src/wallet/api/wallet.cpp:        m_wallet->stop();
+src/wallet/api/wallet.cpp:        m_wallet->deinit();
+src/wallet/api/wallet.cpp:        m_wallet->get_seed(seed);
+src/wallet/api/wallet.cpp:    return m_wallet->get_seed_language();
+src/wallet/api/wallet.cpp:    m_wallet->set_seed_language(arg);
+src/wallet/api/wallet.cpp:        m_wallet->change_password(m_wallet->get_wallet_file(), m_password, password);
+src/wallet/api/wallet.cpp:    return m_wallet->get_subaddress_as_str({accountIndex, addressIndex});
+src/wallet/api/wallet.cpp:    return m_wallet->get_integrated_address_as_str(pid);
+src/wallet/api/wallet.cpp:    return epee::string_tools::pod_to_hex(m_wallet->get_account().get_keys().m_view_secret_key);
+src/wallet/api/wallet.cpp:    return epee::string_tools::pod_to_hex(m_wallet->get_account().get_keys().m_account_address.m_view_public_key);
+src/wallet/api/wallet.cpp:    return epee::string_tools::pod_to_hex(m_wallet->get_account().get_keys().m_spend_secret_key);
+src/wallet/api/wallet.cpp:    return epee::string_tools::pod_to_hex(m_wallet->get_account().get_keys().m_account_address.m_spend_public_key);
+src/wallet/api/wallet.cpp:        crypto::public_key signer = m_wallet->get_multisig_signer_public_key();
+src/wallet/api/wallet.cpp:    return m_wallet->path();
+src/wallet/api/wallet.cpp:            m_wallet->store();
+src/wallet/api/wallet.cpp:            m_wallet->store_to(path, m_password);
+src/wallet/api/wallet.cpp:    return m_wallet->get_wallet_file();
+src/wallet/api/wallet.cpp:    return m_wallet->get_keys_file();
+src/wallet/api/wallet.cpp:    m_wallet->set_light_wallet(lightWallet);
+src/wallet/api/wallet.cpp:  return m_wallet->light_wallet_login(isNewWallet);
+src/wallet/api/wallet.cpp:    if(!m_wallet->light_wallet_import_wallet_request(response)){
+src/wallet/api/wallet.cpp:    m_wallet->set_refresh_from_block_height(refresh_from_block_height);
+src/wallet/api/wallet.cpp:    m_wallet->set_subaddress_lookahead(major, minor);
+src/wallet/api/wallet.cpp:    return m_wallet->balance(accountIndex);
+src/wallet/api/wallet.cpp:    return m_wallet->unlocked_balance(accountIndex);
+src/wallet/api/wallet.cpp:    if(m_wallet->light_wallet()) {
+src/wallet/api/wallet.cpp:        return m_wallet->get_light_wallet_scanned_block_height();
+src/wallet/api/wallet.cpp:    return m_wallet->get_blockchain_current_height();
+src/wallet/api/wallet.cpp:    return m_wallet->get_approximate_blockchain_height();
+src/wallet/api/wallet.cpp:    return m_wallet->estimate_blockchain_height();
+src/wallet/api/wallet.cpp:    if(m_wallet->light_wallet()) {
+src/wallet/api/wallet.cpp:        return m_wallet->get_light_wallet_scanned_block_height();
+src/wallet/api/wallet.cpp:    uint64_t result = m_wallet->get_daemon_blockchain_height(err);
+src/wallet/api/wallet.cpp:    if(m_wallet->light_wallet()) {
+src/wallet/api/wallet.cpp:        return m_wallet->get_light_wallet_blockchain_height();
+src/wallet/api/wallet.cpp:    uint64_t result = m_wallet->get_daemon_blockchain_target_height(err);
+src/wallet/api/wallet.cpp:  if (!m_wallet->load_unsigned_tx(unsigned_filename, transaction->m_unsigned_tx_set)){
+src/wallet/api/wallet.cpp:  bool r = m_wallet->load_tx(fileName, transaction->m_pending_tx);
+src/wallet/api/wallet.cpp:  if (m_wallet->watch_only())
+src/wallet/api/wallet.cpp:    if (!m_wallet->export_key_images(filename, false /* requested_ki_only */))
+src/wallet/api/wallet.cpp:    uint64_t height = m_wallet->import_key_images(filename, spent, unspent);
+src/wallet/api/wallet.cpp:    m_wallet->add_subaddress_account(label);
+src/wallet/api/wallet.cpp:    return m_wallet->get_num_subaddress_accounts();
+src/wallet/api/wallet.cpp:    return m_wallet->get_num_subaddresses(accountIndex);
+src/wallet/api/wallet.cpp:    m_wallet->add_subaddress(accountIndex, label);
+src/wallet/api/wallet.cpp:        return m_wallet->get_subaddress_label({accountIndex, addressIndex});
+src/wallet/api/wallet.cpp:        return m_wallet->set_subaddress_label({accountIndex, addressIndex}, label);
+src/wallet/api/wallet.cpp:    state.isMultisig = m_wallet->multisig(&state.isReady, &state.threshold, &state.total);
+src/wallet/api/wallet.cpp:        return m_wallet->get_multisig_info();
+src/wallet/api/wallet.cpp:        if (m_wallet->multisig()) {
+src/wallet/api/wallet.cpp:        return m_wallet->make_multisig(epee::wipeable_string(m_password), info, threshold);
+src/wallet/api/wallet.cpp:        return m_wallet->exchange_multisig_keys(epee::wipeable_string(m_password), info);
+src/wallet/api/wallet.cpp:        if (m_wallet->finalize_multisig(epee::wipeable_string(m_password), extraMultisigInfo)) {
+src/wallet/api/wallet.cpp:        auto blob = m_wallet->export_multisig();
+src/wallet/api/wallet.cpp:        return m_wallet->import_multisig(blobs);
+src/wallet/api/wallet.cpp:        return m_wallet->has_multisig_partial_key_images();
+src/wallet/api/wallet.cpp:        if (!m_wallet->load_multisig_tx(binary, txSet, {})) {
+src/wallet/api/wallet.cpp:    size_t fake_outs_count = mixin_count > 0 ? mixin_count : m_wallet->default_mixin();
+src/wallet/api/wallet.cpp:    fake_outs_count = m_wallet->adjust_mixin(fake_outs_count);
+src/wallet/api/wallet.cpp:    uint32_t adjusted_priority = m_wallet->adjust_priority(static_cast<uint32_t>(priority));
+src/wallet/api/wallet.cpp:        if(!cryptonote::get_account_address_from_str(info, m_wallet->nettype(), dst_addr)) {
+src/wallet/api/wallet.cpp:                transaction->m_pending_tx = m_wallet->create_transactions_2(dsts, fake_outs_count, 0 /* unlock_time */,
+src/wallet/api/wallet.cpp:                    for (uint32_t index = 0; index < m_wallet->get_num_subaddresses(subaddr_account); ++index)
+src/wallet/api/wallet.cpp:                transaction->m_pending_tx = m_wallet->create_transactions_all(0, info.address, info.is_subaddress, 1, fake_outs_count, 0 /* unlock_time */,
+src/wallet/api/wallet.cpp:                transaction->m_signers = m_wallet->make_multisig_tx_set(transaction->m_pending_tx).m_signers;
+src/wallet/api/wallet.cpp:            transaction->m_pending_tx = m_wallet->create_unmixable_sweep_transactions();
+src/wallet/api/wallet.cpp:    return m_wallet->default_mixin();
+src/wallet/api/wallet.cpp:    m_wallet->default_mixin(arg);
+src/wallet/api/wallet.cpp:    m_wallet->set_tx_note(htxid, note);
+src/wallet/api/wallet.cpp:    return m_wallet->get_tx_note(htxid);
+src/wallet/api/wallet.cpp:    if (m_wallet->get_tx_key(txid, tx_key, additional_tx_keys))
+src/wallet/api/wallet.cpp:    if (!cryptonote::get_account_address_from_str(info, m_wallet->nettype(), address_str))
+src/wallet/api/wallet.cpp:        m_wallet->check_tx_key(txid, tx_key, additional_tx_keys, info.address, received, in_pool, confirmations);
+src/wallet/api/wallet.cpp:    if (!cryptonote::get_account_address_from_str(info, m_wallet->nettype(), address_str))
+src/wallet/api/wallet.cpp:        return m_wallet->get_tx_proof(txid, info.address, info.is_subaddress, message);
+src/wallet/api/wallet.cpp:    if (!cryptonote::get_account_address_from_str(info, m_wallet->nettype(), address_str))
+src/wallet/api/wallet.cpp:        good = m_wallet->check_tx_proof(txid, info.address, info.is_subaddress, message, signature, received, in_pool, confirmations);
+src/wallet/api/wallet.cpp:        return m_wallet->get_spend_proof(txid, message);
+src/wallet/api/wallet.cpp:        good = m_wallet->check_spend_proof(txid, message, signature);
+src/wallet/api/wallet.cpp:        return m_wallet->get_reserve_proof(account_minreserve, message);
+src/wallet/api/wallet.cpp:    if (!cryptonote::get_account_address_from_str(info, m_wallet->nettype(), address))
+src/wallet/api/wallet.cpp:        good = m_wallet->check_reserve_proof(info.address, message, signature, total, spent);
+src/wallet/api/wallet.cpp:  return m_wallet->sign(message);
+src/wallet/api/wallet.cpp:  if (!cryptonote::get_account_address_from_str(info, m_wallet->nettype(), address))
+src/wallet/api/wallet.cpp:  return m_wallet->verify(message, info.address, signature);
+src/wallet/api/wallet.cpp:    if (!m_wallet->multisig(&ready) || !ready) {
+src/wallet/api/wallet.cpp:        return m_wallet->sign_multisig_participant(message);
+src/wallet/api/wallet.cpp:        return m_wallet->verify_with_public_key(message, pkey, signature);
+src/wallet/api/wallet.cpp:    bool result = m_wallet->check_connection(NULL, DEFAULT_CONNECTION_TIMEOUT_MILLIS);
+src/wallet/api/wallet.cpp:        setStatusError("Error connecting to daemon at " + m_wallet->get_daemon_address());
+src/wallet/api/wallet.cpp:    m_is_connected = m_wallet->check_connection(&version, DEFAULT_CONNECTION_TIMEOUT_MILLIS);
+src/wallet/api/wallet.cpp:    if (!m_wallet->light_wallet() && (version >> 16) != CORE_RPC_VERSION_MAJOR)
+src/wallet/api/wallet.cpp:    m_wallet->set_trusted_daemon(arg);
+src/wallet/api/wallet.cpp:    return m_wallet->is_trusted_daemon();
+src/wallet/api/wallet.cpp:    return m_wallet->watch_only();
+src/wallet/api/wallet.cpp:        if (m_wallet->light_wallet() || daemonSynced()) {
+src/wallet/api/wallet.cpp:                m_wallet->rescan_blockchain(false);
+src/wallet/api/wallet.cpp:            m_wallet->refresh(trustedDaemon());
+src/wallet/api/wallet.cpp:            m_wallet->find_and_save_rings(false);
+src/wallet/api/wallet.cpp:    if (!m_wallet->init(daemon_address, m_daemon_login, upper_transaction_size_limit, ssl))
+src/wallet/api/wallet.cpp:        m_wallet->set_refresh_from_block_height(daemonBlockChainHeight());
+src/wallet/api/wallet.cpp:      LOG_PRINT_L2(__FUNCTION__ << ": Rebuilding wallet cache, fast refresh until block " << m_wallet->get_refresh_from_block_height());
+src/wallet/api/wallet.cpp:    return m_wallet->parse_uri(uri, address, payment_id, amount, tx_description, recipient_name, unknown_parameters, error);
+src/wallet/api/wallet.cpp:      m_wallet->rescan_spent();
+src/wallet/api/wallet.cpp:    m_wallet->get_hard_fork_info(version, earliest_height);
+src/wallet/api/wallet.cpp:    return m_wallet->use_fork_rules(version,early_blocks);
+src/wallet/api/wallet.cpp:    bool ret = m_wallet->set_blackballed_outputs(raw_outputs, add);
+src/wallet/api/wallet.cpp:    bool ret = m_wallet->blackball_output(std::make_pair(raw_amount, raw_offset));
+src/wallet/api/wallet.cpp:    bool ret = m_wallet->unblackball_output(std::make_pair(raw_amount, raw_offset));
+src/wallet/api/wallet.cpp:    bool ret = m_wallet->get_ring(raw_key_image, ring);
+src/wallet/api/wallet.cpp:    bool ret = m_wallet->get_rings(raw_txid, raw_rings);
+src/wallet/api/wallet.cpp:    bool ret = m_wallet->set_ring(raw_key_image, ring, relative);
+src/wallet/api/wallet.cpp:    m_wallet->segregate_pre_fork_outputs(segregate);
+src/wallet/api/wallet.cpp:    m_wallet->segregation_height(height);
+src/wallet/api/wallet.cpp:    m_wallet->key_reuse_mitigation2(mitigation);
+src/wallet/api/wallet.cpp:    return m_wallet->lock_keys_file();
+src/wallet/api/wallet.cpp:    return m_wallet->unlock_keys_file();
+src/wallet/api/wallet.cpp:    return m_wallet->is_keys_file_locked();
+src/wallet/api/wallet.cpp:  if (!cryptonote::get_account_address_from_str_or_url(addr_info, m_wallet->nettype(), address_str))
+src/wallet/api/wallet.cpp:  wallet2::stake_result stake_result = m_wallet->create_stake_tx(transaction->m_pending_tx, sn_key, addr_info, amount);
+src/wallet/api/pending_transaction.cpp:        bool r = m_wallet.m_wallet->save_tx(m_pending_tx, filename);
+src/wallet/api/pending_transaction.cpp:            m_wallet.m_wallet->commit_tx(ptx);
+src/wallet/api/pending_transaction.cpp:        auto cipher = m_wallet.m_wallet->save_multisig_tx(txSet);
+src/wallet/api/pending_transaction.cpp:        if (!m_wallet.m_wallet->sign_multisig_tx(txSet, ignore)) {
+src/wallet/api/wallet.h:    uint64_t getRefreshFromBlockHeight() const override { return m_wallet->get_refresh_from_block_height(); };
+src/wallet/api/wallet.h:    NetworkType nettype() const override {return static_cast<NetworkType>(m_wallet->nettype());}
+src/wallet/api/transaction_history.cpp:    uint64_t wallet_height = m_wallet->blockChainHeight();
+src/wallet/api/transaction_history.cpp:    m_wallet->m_wallet->get_payments(in_payments, min_height, max_height);
+src/wallet/api/transaction_history.cpp:        ti->m_label     = m_wallet->m_wallet->get_subaddress_label(pd.m_subaddr_index);
+src/wallet/api/transaction_history.cpp:    m_wallet->m_wallet->get_payments_out(out_payments, min_height, max_height);
+src/wallet/api/transaction_history.cpp:        ti->m_label = pd.m_subaddr_indices.size() == 1 ? m_wallet->m_wallet->get_subaddress_label({pd.m_subaddr_account, *pd.m_subaddr_indices.begin()}) : "";
+src/wallet/api/transaction_history.cpp:            ti->m_transfers.push_back({d.amount, get_account_address_as_str(m_wallet->m_wallet->nettype(), d.is_subaddress, d.addr)});
+src/wallet/api/transaction_history.cpp:    m_wallet->m_wallet->get_unconfirmed_payments_out(upayments_out);
+src/wallet/api/transaction_history.cpp:        ti->m_label = pd.m_subaddr_indices.size() == 1 ? m_wallet->m_wallet->get_subaddress_label({pd.m_subaddr_account, *pd.m_subaddr_indices.begin()}) : "";
+src/wallet/api/transaction_history.cpp:    m_wallet->m_wallet->get_unconfirmed_payments(upayments);
+src/wallet/api/transaction_history.cpp:        ti->m_label     = m_wallet->m_wallet->get_subaddress_label(pd.m_subaddr_index);
+src/wallet/api/subaddress_account.cpp:  m_wallet->m_wallet->add_subaddress_account(label);
+src/wallet/api/subaddress_account.cpp:  m_wallet->m_wallet->set_subaddress_label({accountIndex, 0}, label);
+src/wallet/api/subaddress_account.cpp:  for (uint32_t i = 0; i < m_wallet->m_wallet->get_num_subaddress_accounts(); ++i)
+src/wallet/api/subaddress_account.cpp:      m_wallet->m_wallet->get_subaddress_as_str({i,0}),
+src/wallet/api/subaddress_account.cpp:      m_wallet->m_wallet->get_subaddress_label({i,0}),
+src/wallet/api/subaddress_account.cpp:      cryptonote::print_money(m_wallet->m_wallet->balance(i)),
+src/wallet/api/subaddress_account.cpp:      cryptonote::print_money(m_wallet->m_wallet->unlocked_balance(i))
+src/wallet/api/subaddress.cpp:  m_wallet->m_wallet->add_subaddress(accountIndex, label);
+src/wallet/api/subaddress.cpp:    m_wallet->m_wallet->set_subaddress_label({accountIndex, addressIndex}, label);
+src/wallet/api/subaddress.cpp:  for (size_t i = 0; i < m_wallet->m_wallet->get_num_subaddresses(accountIndex); ++i)
+src/wallet/api/subaddress.cpp:    m_rows.push_back(new SubaddressRow(i, m_wallet->m_wallet->get_subaddress_as_str({accountIndex, (uint32_t)i}), m_wallet->m_wallet->get_subaddress_label({accountIndex, (uint32_t)i})));
+src/wallet/wallet_rpc_server.cpp:        if (m_wallet) m_wallet->refresh(m_wallet->is_trusted_daemon());
+src/wallet/wallet_rpc_server.cpp:      m_wallet->store();
+src/wallet/wallet_rpc_server.cpp:    entry.note = m_wallet->get_tx_note(pd.m_tx_hash);
+src/wallet/wallet_rpc_server.cpp:    entry.address = m_wallet->get_subaddress_as_str(pd.m_subaddr_index);
+src/wallet/wallet_rpc_server.cpp:    set_confirmations(entry, m_wallet->get_blockchain_current_height(), m_wallet->get_last_block_reward());
+src/wallet/wallet_rpc_server.cpp:    entry.note = m_wallet->get_tx_note(txid);
+src/wallet/wallet_rpc_server.cpp:      td.address = get_account_address_as_str(m_wallet->nettype(), d.is_subaddress, d.addr);
+src/wallet/wallet_rpc_server.cpp:    entry.address = m_wallet->get_subaddress_as_str({pd.m_subaddr_account, 0});
+src/wallet/wallet_rpc_server.cpp:    set_confirmations(entry, m_wallet->get_blockchain_current_height(), m_wallet->get_last_block_reward());
+src/wallet/wallet_rpc_server.cpp:    entry.note = m_wallet->get_tx_note(txid);
+src/wallet/wallet_rpc_server.cpp:    entry.address = m_wallet->get_subaddress_as_str({pd.m_subaddr_account, 0});
+src/wallet/wallet_rpc_server.cpp:    set_confirmations(entry, m_wallet->get_blockchain_current_height(), m_wallet->get_last_block_reward());
+src/wallet/wallet_rpc_server.cpp:    entry.note = m_wallet->get_tx_note(pd.m_tx_hash);
+src/wallet/wallet_rpc_server.cpp:    entry.address = m_wallet->get_subaddress_as_str(pd.m_subaddr_index);
+src/wallet/wallet_rpc_server.cpp:    set_confirmations(entry, m_wallet->get_blockchain_current_height(), m_wallet->get_last_block_reward());
+src/wallet/wallet_rpc_server.cpp:      res.balance = m_wallet->balance(req.account_index);
+src/wallet/wallet_rpc_server.cpp:      res.unlocked_balance = m_wallet->unlocked_balance(req.account_index);
+src/wallet/wallet_rpc_server.cpp:      res.multisig_import_needed = m_wallet->multisig() && m_wallet->has_multisig_partial_key_images();
+src/wallet/wallet_rpc_server.cpp:      std::map<uint32_t, uint64_t> balance_per_subaddress = m_wallet->balance_per_subaddress(req.account_index);
+src/wallet/wallet_rpc_server.cpp:      std::map<uint32_t, uint64_t> unlocked_balance_per_subaddress = m_wallet->unlocked_balance_per_subaddress(req.account_index);
+src/wallet/wallet_rpc_server.cpp:      m_wallet->get_transfers(transfers);
+src/wallet/wallet_rpc_server.cpp:        info.address = m_wallet->get_subaddress_as_str(index);
+src/wallet/wallet_rpc_server.cpp:        info.label = m_wallet->get_subaddress_label(index);
+src/wallet/wallet_rpc_server.cpp:      THROW_WALLET_EXCEPTION_IF(req.account_index >= m_wallet->get_num_subaddress_accounts(), error::account_index_outofbound);
+src/wallet/wallet_rpc_server.cpp:        for (uint32_t i = 0; i < m_wallet->get_num_subaddresses(req.account_index); ++i)
+src/wallet/wallet_rpc_server.cpp:      m_wallet->get_transfers(transfers);
+src/wallet/wallet_rpc_server.cpp:        THROW_WALLET_EXCEPTION_IF(i >= m_wallet->get_num_subaddresses(req.account_index), error::address_index_outofbound);
+src/wallet/wallet_rpc_server.cpp:        info.address = m_wallet->get_subaddress_as_str(index);
+src/wallet/wallet_rpc_server.cpp:        info.label = m_wallet->get_subaddress_label(index);
+src/wallet/wallet_rpc_server.cpp:      res.address = m_wallet->get_subaddress_as_str({req.account_index, 0});
+src/wallet/wallet_rpc_server.cpp:    if(!get_account_address_from_str(info, m_wallet->nettype(), req.address))
+src/wallet/wallet_rpc_server.cpp:    auto index = m_wallet->get_subaddress_index(info.address);
+src/wallet/wallet_rpc_server.cpp:      m_wallet->add_subaddress(req.account_index, req.label);
+src/wallet/wallet_rpc_server.cpp:      res.address_index = m_wallet->get_num_subaddresses(req.account_index) - 1;
+src/wallet/wallet_rpc_server.cpp:      res.address = m_wallet->get_subaddress_as_str({req.account_index, res.address_index});
+src/wallet/wallet_rpc_server.cpp:      m_wallet->set_subaddress_label(req.index, req.label);
+src/wallet/wallet_rpc_server.cpp:      const std::pair<std::map<std::string, std::string>, std::vector<std::string>> account_tags = m_wallet->get_account_tags();
+src/wallet/wallet_rpc_server.cpp:      for (; subaddr_index.major < m_wallet->get_num_subaddress_accounts(); ++subaddr_index.major)
+src/wallet/wallet_rpc_server.cpp:        info.base_address = m_wallet->get_subaddress_as_str(subaddr_index);
+src/wallet/wallet_rpc_server.cpp:        info.balance = m_wallet->balance(subaddr_index.major);
+src/wallet/wallet_rpc_server.cpp:        info.unlocked_balance = m_wallet->unlocked_balance(subaddr_index.major);
+src/wallet/wallet_rpc_server.cpp:        info.label = m_wallet->get_subaddress_label(subaddr_index);
+src/wallet/wallet_rpc_server.cpp:      m_wallet->add_subaddress_account(req.label);
+src/wallet/wallet_rpc_server.cpp:      res.account_index = m_wallet->get_num_subaddress_accounts() - 1;
+src/wallet/wallet_rpc_server.cpp:      res.address = m_wallet->get_subaddress_as_str({res.account_index, 0});
+src/wallet/wallet_rpc_server.cpp:      m_wallet->set_subaddress_label({req.account_index, 0}, req.label);
+src/wallet/wallet_rpc_server.cpp:    const std::pair<std::map<std::string, std::string>, std::vector<std::string>> account_tags = m_wallet->get_account_tags();
+src/wallet/wallet_rpc_server.cpp:      m_wallet->set_account_tag(req.accounts, req.tag);
+src/wallet/wallet_rpc_server.cpp:      m_wallet->set_account_tag(req.accounts, "");
+src/wallet/wallet_rpc_server.cpp:      m_wallet->set_account_tag_description(req.tag, req.description);
+src/wallet/wallet_rpc_server.cpp:      res.height = m_wallet->get_blockchain_current_height();
+src/wallet/wallet_rpc_server.cpp:      if(!get_account_address_from_str_or_url(info, m_wallet->nettype(), it->address,
+src/wallet/wallet_rpc_server.cpp:    if (m_wallet->multisig())
+src/wallet/wallet_rpc_server.cpp:      multisig_txset = epee::string_tools::buff_to_hex_nodelimer(m_wallet->save_multisig_tx(ptx_vector));
+src/wallet/wallet_rpc_server.cpp:      if (m_wallet->watch_only()){
+src/wallet/wallet_rpc_server.cpp:        unsigned_txset = epee::string_tools::buff_to_hex_nodelimer(m_wallet->dump_tx_to_str(ptx_vector));
+src/wallet/wallet_rpc_server.cpp:        m_wallet->commit_tx(ptx_vector);
+src/wallet/wallet_rpc_server.cpp:        mixin = m_wallet->adjust_mixin(req.ring_size - 1);
+src/wallet/wallet_rpc_server.cpp:        mixin = m_wallet->adjust_mixin(req.mixin);
+src/wallet/wallet_rpc_server.cpp:      uint32_t priority = m_wallet->adjust_priority(req.priority);
+src/wallet/wallet_rpc_server.cpp:      std::vector<wallet2::pending_tx> ptx_vector = m_wallet->create_transactions_2(dsts, mixin, req.unlock_time, priority, extra, req.account_index, req.subaddr_indices);
+src/wallet/wallet_rpc_server.cpp:        mixin = m_wallet->adjust_mixin(req.ring_size - 1);
+src/wallet/wallet_rpc_server.cpp:        mixin = m_wallet->adjust_mixin(req.mixin);
+src/wallet/wallet_rpc_server.cpp:      uint32_t priority = m_wallet->adjust_priority(req.priority);
+src/wallet/wallet_rpc_server.cpp:      std::vector<wallet2::pending_tx> ptx_vector = m_wallet->create_transactions_2(dsts, mixin, req.unlock_time, priority, extra, req.account_index, req.subaddr_indices);
+src/wallet/wallet_rpc_server.cpp:    if (m_wallet->key_on_device())
+src/wallet/wallet_rpc_server.cpp:    if(m_wallet->watch_only())
+src/wallet/wallet_rpc_server.cpp:    if(!m_wallet->parse_unsigned_tx_from_str(blob, exported_txs))
+src/wallet/wallet_rpc_server.cpp:      std::string ciphertext = m_wallet->sign_tx_dump_to_str(exported_txs, ptxs, signed_txs);
+src/wallet/wallet_rpc_server.cpp:    if (m_wallet->key_on_device())
+src/wallet/wallet_rpc_server.cpp:    if(m_wallet->watch_only())
+src/wallet/wallet_rpc_server.cpp:      if(!m_wallet->parse_unsigned_tx_from_str(blob, exported_txs))
+src/wallet/wallet_rpc_server.cpp:          std::string address = cryptonote::get_account_address_as_str(m_wallet->nettype(), entry.is_subaddress, entry.addr);
+src/wallet/wallet_rpc_server.cpp:            address = cryptonote::get_account_integrated_address_as_str(m_wallet->nettype(), entry.addr, payment_id8);
+src/wallet/wallet_rpc_server.cpp:          desc.change_address = get_account_address_as_str(m_wallet->nettype(), cd0.subaddr_account > 0, cd0.change_dts.addr);
+src/wallet/wallet_rpc_server.cpp:    if (m_wallet->key_on_device())
+src/wallet/wallet_rpc_server.cpp:      bool r = m_wallet->parse_tx_from_str(blob, ptx_vector, NULL);
+src/wallet/wallet_rpc_server.cpp:        m_wallet->commit_tx(ptx);
+src/wallet/wallet_rpc_server.cpp:      std::vector<wallet2::pending_tx> ptx_vector = m_wallet->create_unmixable_sweep_transactions();
+src/wallet/wallet_rpc_server.cpp:        mixin = m_wallet->adjust_mixin(req.ring_size - 1);
+src/wallet/wallet_rpc_server.cpp:        mixin = m_wallet->adjust_mixin(req.mixin);
+src/wallet/wallet_rpc_server.cpp:      uint32_t priority = m_wallet->adjust_priority(req.priority);
+src/wallet/wallet_rpc_server.cpp:      std::vector<wallet2::pending_tx> ptx_vector = m_wallet->create_transactions_all(req.below_amount, dsts[0].addr, dsts[0].is_subaddress, req.outputs, mixin, req.unlock_time, priority, extra, req.account_index, req.subaddr_indices);
+src/wallet/wallet_rpc_server.cpp:        mixin = m_wallet->adjust_mixin(req.ring_size - 1);
+src/wallet/wallet_rpc_server.cpp:        mixin = m_wallet->adjust_mixin(req.mixin);
+src/wallet/wallet_rpc_server.cpp:      uint32_t priority = m_wallet->adjust_priority(req.priority);
+src/wallet/wallet_rpc_server.cpp:      std::vector<wallet2::pending_tx> ptx_vector = m_wallet->create_transactions_single(ki, dsts[0].addr, dsts[0].is_subaddress, req.outputs, mixin, req.unlock_time, priority, extra);
+src/wallet/wallet_rpc_server.cpp:      m_wallet->commit_tx(ptx);
+src/wallet/wallet_rpc_server.cpp:        res.integrated_address = m_wallet->get_integrated_address_as_str(payment_id);
+src/wallet/wallet_rpc_server.cpp:        if(!get_account_address_from_str(info, m_wallet->nettype(), req.standard_address))
+src/wallet/wallet_rpc_server.cpp:        res.integrated_address = get_account_integrated_address_as_str(m_wallet->nettype(), info.address, payment_id);
+src/wallet/wallet_rpc_server.cpp:      if(!get_account_address_from_str(info, m_wallet->nettype(), req.integrated_address))
+src/wallet/wallet_rpc_server.cpp:      res.standard_address = get_account_address_as_str(m_wallet->nettype(), info.is_subaddress, info.address);
+src/wallet/wallet_rpc_server.cpp:      m_wallet->store();
+src/wallet/wallet_rpc_server.cpp:    m_wallet->get_payments(payment_id, payment_list);
+src/wallet/wallet_rpc_server.cpp:      rpc_payment.address      = m_wallet->get_subaddress_as_str(payment.m_subaddr_index);
+src/wallet/wallet_rpc_server.cpp:      m_wallet->get_payments(payment_list, req.min_block_height);
+src/wallet/wallet_rpc_server.cpp:        rpc_payment.address      = m_wallet->get_subaddress_as_str(payment.second.m_subaddr_index);
+src/wallet/wallet_rpc_server.cpp:      m_wallet->get_payments(payment_id, payment_list, req.min_block_height);
+src/wallet/wallet_rpc_server.cpp:        rpc_payment.address      = m_wallet->get_subaddress_as_str(payment.m_subaddr_index);
+src/wallet/wallet_rpc_server.cpp:    m_wallet->get_transfers(transfers);
+src/wallet/wallet_rpc_server.cpp:        if (m_wallet->multisig(&ready))
+src/wallet/wallet_rpc_server.cpp:          if (!m_wallet->get_multisig_seed(seed))
+src/wallet/wallet_rpc_server.cpp:          if (m_wallet->watch_only())
+src/wallet/wallet_rpc_server.cpp:          if (!m_wallet->is_deterministic())
+src/wallet/wallet_rpc_server.cpp:          if (!m_wallet->get_seed(seed))
+src/wallet/wallet_rpc_server.cpp:          epee::wipeable_string key = epee::to_hex::wipeable_string(m_wallet->get_account().get_keys().m_view_secret_key);
+src/wallet/wallet_rpc_server.cpp:          epee::wipeable_string key = epee::to_hex::wipeable_string(m_wallet->get_account().get_keys().m_spend_secret_key);
+src/wallet/wallet_rpc_server.cpp:      m_wallet->rescan_blockchain(req.hard);
+src/wallet/wallet_rpc_server.cpp:    res.signature = m_wallet->sign(req.data);
+src/wallet/wallet_rpc_server.cpp:    if(!get_account_address_from_str_or_url(info, m_wallet->nettype(), req.address,
+src/wallet/wallet_rpc_server.cpp:    res.good = m_wallet->verify(req.data, info.address, req.signature);
+src/wallet/wallet_rpc_server.cpp:      m_wallet->store();
+src/wallet/wallet_rpc_server.cpp:      m_wallet->set_tx_note(*il++, *in++);
+src/wallet/wallet_rpc_server.cpp:      res.notes.push_back(m_wallet->get_tx_note(*il++));
+src/wallet/wallet_rpc_server.cpp:    m_wallet->set_attribute(req.key, req.value);
+src/wallet/wallet_rpc_server.cpp:    res.value = m_wallet->get_attribute(req.key);
+src/wallet/wallet_rpc_server.cpp:    if (!m_wallet->get_tx_key(txid, tx_key, additional_tx_keys))
+src/wallet/wallet_rpc_server.cpp:    if(!get_account_address_from_str(info, m_wallet->nettype(), req.address))
+src/wallet/wallet_rpc_server.cpp:      m_wallet->check_tx_key(txid, tx_key, additional_tx_keys, info.address, res.received, res.in_pool, res.confirmations);
+src/wallet/wallet_rpc_server.cpp:    if(!get_account_address_from_str(info, m_wallet->nettype(), req.address))
+src/wallet/wallet_rpc_server.cpp:      res.signature = m_wallet->get_tx_proof(txid, info.address, info.is_subaddress, req.message);
+src/wallet/wallet_rpc_server.cpp:    if(!get_account_address_from_str(info, m_wallet->nettype(), req.address))
+src/wallet/wallet_rpc_server.cpp:      res.good = m_wallet->check_tx_proof(txid, info.address, info.is_subaddress, req.message, req.signature, res.received, res.in_pool, res.confirmations);
+src/wallet/wallet_rpc_server.cpp:      res.signature = m_wallet->get_spend_proof(txid, req.message);
+src/wallet/wallet_rpc_server.cpp:      res.good = m_wallet->check_spend_proof(txid, req.message, req.signature);
+src/wallet/wallet_rpc_server.cpp:      if (req.account_index >= m_wallet->get_num_subaddress_accounts())
+src/wallet/wallet_rpc_server.cpp:      res.signature = m_wallet->get_reserve_proof(account_minreserve, req.message);
+src/wallet/wallet_rpc_server.cpp:    if (!get_account_address_from_str(info, m_wallet->nettype(), req.address))
+src/wallet/wallet_rpc_server.cpp:      res.good = m_wallet->check_reserve_proof(info.address, req.message, req.signature, res.total, res.spent);
+src/wallet/wallet_rpc_server.cpp:      m_wallet->get_payments(payments, min_height, max_height, req.account_index, req.subaddr_indices);
+src/wallet/wallet_rpc_server.cpp:      m_wallet->get_payments_out(payments, min_height, max_height, req.account_index, req.subaddr_indices);
+src/wallet/wallet_rpc_server.cpp:      m_wallet->get_unconfirmed_payments_out(upayments, req.account_index, req.subaddr_indices);
+src/wallet/wallet_rpc_server.cpp:      m_wallet->update_pool_state();
+src/wallet/wallet_rpc_server.cpp:      m_wallet->get_unconfirmed_payments(payments, req.account_index, req.subaddr_indices);
+src/wallet/wallet_rpc_server.cpp:    if (req.account_index >= m_wallet->get_num_subaddress_accounts())
+src/wallet/wallet_rpc_server.cpp:    m_wallet->get_payments(payments, 0, (uint64_t)-1, req.account_index);
+src/wallet/wallet_rpc_server.cpp:    m_wallet->get_payments_out(payments_out, 0, (uint64_t)-1, req.account_index);
+src/wallet/wallet_rpc_server.cpp:    m_wallet->get_unconfirmed_payments_out(upayments, req.account_index);
+src/wallet/wallet_rpc_server.cpp:    m_wallet->update_pool_state();
+src/wallet/wallet_rpc_server.cpp:    m_wallet->get_unconfirmed_payments(pool_payments, req.account_index);
+src/wallet/wallet_rpc_server.cpp:    if (m_wallet->key_on_device())
+src/wallet/wallet_rpc_server.cpp:      res.outputs_data_hex = epee::string_tools::buff_to_hex_nodelimer(m_wallet->export_outputs_to_str());
+src/wallet/wallet_rpc_server.cpp:    if (m_wallet->key_on_device())
+src/wallet/wallet_rpc_server.cpp:      res.num_imported = m_wallet->import_outputs_from_str(blob);
+src/wallet/wallet_rpc_server.cpp:      std::pair<size_t, std::vector<std::pair<crypto::key_image, crypto::signature>>> ski = m_wallet->export_key_images(req.requested_only);
+src/wallet/wallet_rpc_server.cpp:    if (!m_wallet->is_trusted_daemon())
+src/wallet/wallet_rpc_server.cpp:      uint64_t height = m_wallet->import_key_images(ski, req.offset, spent, unspent);
+src/wallet/wallet_rpc_server.cpp:    std::string uri = m_wallet->make_uri(req.address, req.payment_id, req.amount, req.tx_description, req.recipient_name, error);
+src/wallet/wallet_rpc_server.cpp:    if (!m_wallet->parse_uri(req.uri, res.uri.address, res.uri.payment_id, res.uri.amount, res.uri.tx_description, res.uri.recipient_name, res.unknown_parameters, error))
+src/wallet/wallet_rpc_server.cpp:    const auto ab = m_wallet->get_address_book();
+src/wallet/wallet_rpc_server.cpp:        res.entries.push_back(wallet_rpc::COMMAND_RPC_GET_ADDRESS_BOOK_ENTRY::entry{idx++, get_account_address_as_str(m_wallet->nettype(), entry.m_is_subaddress, entry.m_address), epee::string_tools::pod_to_hex(entry.m_payment_id), entry.m_description});
+src/wallet/wallet_rpc_server.cpp:        res.entries.push_back(wallet_rpc::COMMAND_RPC_GET_ADDRESS_BOOK_ENTRY::entry{idx, get_account_address_as_str(m_wallet->nettype(), entry.m_is_subaddress, entry.m_address), epee::string_tools::pod_to_hex(entry.m_payment_id), entry.m_description});
+src/wallet/wallet_rpc_server.cpp:    if(!get_account_address_from_str_or_url(info, m_wallet->nettype(), req.address,
+src/wallet/wallet_rpc_server.cpp:    if (!m_wallet->add_address_book_row(info.address, payment_id, req.description, info.is_subaddress))
+src/wallet/wallet_rpc_server.cpp:    res.index = m_wallet->get_address_book().size() - 1;
+src/wallet/wallet_rpc_server.cpp:    const auto ab = m_wallet->get_address_book();
+src/wallet/wallet_rpc_server.cpp:    if (!m_wallet->delete_address_book_row(req.index))
+src/wallet/wallet_rpc_server.cpp:      m_wallet->refresh(m_wallet->is_trusted_daemon(), req.start_height, res.blocks_fetched, res.received_money);
+src/wallet/wallet_rpc_server.cpp:      m_wallet->rescan_spent();
+src/wallet/wallet_rpc_server.cpp:    if (!m_wallet->is_trusted_daemon())
+src/wallet/wallet_rpc_server.cpp:    daemon_req.miner_address = m_wallet->get_account().get_public_address_str(m_wallet->nettype());
+src/wallet/wallet_rpc_server.cpp:    bool r = m_wallet->invoke_http_json("/start_mining", daemon_req, daemon_res);
+src/wallet/wallet_rpc_server.cpp:    bool r = m_wallet->invoke_http_json("/stop_mining", daemon_req, daemon_res);
+src/wallet/wallet_rpc_server.cpp:        m_wallet->store();
+src/wallet/wallet_rpc_server.cpp:        m_wallet->store();
+src/wallet/wallet_rpc_server.cpp:      m_wallet->store();
+src/wallet/wallet_rpc_server.cpp:    if (m_wallet->verify_password(req.old_password))
+src/wallet/wallet_rpc_server.cpp:        m_wallet->change_password(m_wallet->get_wallet_file(), req.old_password, req.new_password);
+src/wallet/wallet_rpc_server.cpp:        m_wallet->store();
+src/wallet/wallet_rpc_server.cpp:    res.address = m_wallet->get_account().get_public_address_str(m_wallet->nettype());
+src/wallet/wallet_rpc_server.cpp:    res.multisig = m_wallet->multisig(&res.ready, &res.threshold, &res.total);
+src/wallet/wallet_rpc_server.cpp:    if (m_wallet->multisig())
+src/wallet/wallet_rpc_server.cpp:    if (m_wallet->watch_only())
+src/wallet/wallet_rpc_server.cpp:    res.multisig_info = m_wallet->get_multisig_info();
+src/wallet/wallet_rpc_server.cpp:    if (m_wallet->multisig())
+src/wallet/wallet_rpc_server.cpp:    if (m_wallet->watch_only())
+src/wallet/wallet_rpc_server.cpp:      res.multisig_info = m_wallet->make_multisig(req.password, req.multisig_info, req.threshold);
+src/wallet/wallet_rpc_server.cpp:      res.address = m_wallet->get_account().get_public_address_str(m_wallet->nettype());
+src/wallet/wallet_rpc_server.cpp:    if (!m_wallet->multisig(&ready))
+src/wallet/wallet_rpc_server.cpp:      info = m_wallet->export_multisig();
+src/wallet/wallet_rpc_server.cpp:    if (!m_wallet->multisig(&ready, &threshold, &total))
+src/wallet/wallet_rpc_server.cpp:      res.n_outputs = m_wallet->import_multisig(info);
+src/wallet/wallet_rpc_server.cpp:    if (m_wallet->is_trusted_daemon())
+src/wallet/wallet_rpc_server.cpp:        m_wallet->rescan_spent();
+src/wallet/wallet_rpc_server.cpp:    if (!m_wallet->multisig(&ready, &threshold, &total))
+src/wallet/wallet_rpc_server.cpp:      if (!m_wallet->finalize_multisig(req.password, req.multisig_info))
+src/wallet/wallet_rpc_server.cpp:    res.address = m_wallet->get_account().get_public_address_str(m_wallet->nettype());
+src/wallet/wallet_rpc_server.cpp:    if (!m_wallet->multisig(&ready, &threshold, &total))
+src/wallet/wallet_rpc_server.cpp:      res.multisig_info = m_wallet->exchange_multisig_keys(req.password, req.multisig_info);
+src/wallet/wallet_rpc_server.cpp:        res.address = m_wallet->get_account().get_public_address_str(m_wallet->nettype());
+src/wallet/wallet_rpc_server.cpp:    if (!m_wallet->multisig(&ready, &threshold, &total))
+src/wallet/wallet_rpc_server.cpp:    bool r = m_wallet->load_multisig_tx(blob, txs, NULL);
+src/wallet/wallet_rpc_server.cpp:      bool r = m_wallet->sign_multisig_tx(txs, txids);
+src/wallet/wallet_rpc_server.cpp:    res.tx_data_hex = epee::string_tools::buff_to_hex_nodelimer(m_wallet->save_multisig_tx(txs));
+src/wallet/wallet_rpc_server.cpp:    if (!m_wallet->multisig(&ready, &threshold, &total))
+src/wallet/wallet_rpc_server.cpp:    bool r = m_wallet->load_multisig_tx(blob, txs, NULL);
+src/wallet/wallet_rpc_server.cpp:        m_wallet->commit_tx(ptx);
+src/wallet/wallet_rpc_server.cpp:      if (!req.any_net_type && net_type.type != m_wallet->nettype())
+src/wallet/wallet_rpc_server.cpp:    if (!cryptonote::get_account_address_from_str(addr_info, m_wallet->nettype(), req.destination))
+src/wallet/wallet_rpc_server.cpp:    tools::wallet2::stake_result stake_result = m_wallet->create_stake_tx(snode_key, addr_info, req.amount, 0 /*amount_fraction*/, req.priority, 0 /*subaddr_account*/, req.subaddr_indices);
+src/wallet/wallet_rpc_server.cpp:    tools::wallet2::register_full_node_result register_result = m_wallet->create_register_full_node_tx(args, 0 /*subaddr_account*/);
+src/wallet/wallet_rpc_server.cpp:    tools::wallet2::request_stake_unlock_result unlock_result = m_wallet->can_request_stake_unlock(snode_key);
+src/wallet/wallet_rpc_server.cpp:    tools::wallet2::request_stake_unlock_result unlock_result = m_wallet->can_request_stake_unlock(snode_key);
+src/wallet/wallet_rpc_server.cpp:        m_wallet->commit_tx(unlock_result.ptx);
