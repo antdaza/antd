@@ -94,6 +94,15 @@ namespace cryptonote
   bool get_tx_key_image_unlock_from_tx_extra(const std::vector<uint8_t>& tx_extra, tx_extra_tx_key_image_unlock &unlock);
   bool add_tx_key_image_unlock_to_tx_extra(std::vector<uint8_t>& tx_extra, const tx_extra_tx_key_image_unlock& unlock);
 
+struct article_metadata {
+    crypto::hash content_hash;
+    std::string serialized_blob;
+    bool success;
+    std::string error;
+};
+
+  article_metadata set_article_to_tx_extra(const std::string& title, const std::string& content, const std::string& publisher);
+
   void add_full_node_winner_to_tx_extra(std::vector<uint8_t>& tx_extra, const crypto::public_key& winner);
   void add_full_node_pubkey_to_tx_extra(std::vector<uint8_t>& tx_extra, const crypto::public_key& pubkey);
   void add_full_node_contributor_to_tx_extra(std::vector<uint8_t>& tx_extra, const cryptonote::account_public_address& address);

@@ -682,6 +682,9 @@ public:
    */
   virtual std::string get_db_name() const = 0;
 
+  virtual void add_article(const crypto::hash& article_hash, const std::string& content) = 0;
+  virtual bool get_article(const crypto::hash& article_hash, std::string& content) const = 0;
+  virtual bool has_article(const crypto::hash& article_hash) const = 0;
 
   // FIXME: these are just for functionality mocking, need to implement
   // RAII-friendly and multi-read one-write friendly locking mechanism

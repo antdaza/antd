@@ -230,6 +230,8 @@ const char* const LMDB_FULL_NODE_DATA = "full_node_data";
 
 const char* const LMDB_PROPERTIES = "properties";
 
+const char* const LMDB_ARTICLES = "articles";
+
 
 const char zerokey[8] = {0};
 const MDB_val zerokval = { sizeof(zerokey), (void *)zerokey };
@@ -842,6 +844,59 @@ void BlockchainLMDB::remove_block()
       throw1(DB_ERROR(lmdb_error("Failed to add removal of block info to db transaction: ", result).c_str()));
 }
 
+void BlockchainLMDB::add_article(const crypto::hash& article_hash, const std::string& content)
+{
+    LOG_PRINT_L3("BlockchainLMDB::" << __func__);
+    check_open();
+    
+    MDB_txn *txn;
+    int result = mdb_txn_begin(m_env, NULL, 0, &txn);
+    if (result)
+        throw0(DB_ERROR(lmdb_error("Failed to create a transaction for the db: ", result).c_str()));
+    
+    MDB_val key = {sizeof(article_hash), (void *)&article_hash};
+    MDB_val val = {content.size(), (void *)content.data()};
+
+    result = mdb_put(txn, m_articles, &key, &val, 0);
+    if (result == MDB_KEYEXIST) {
+        mdb_txn_abort(txn);
+        throw1(DB_ERROR("Attempted to add article that's already in the db"));
+    }
+    else if (result) {
+        mdb_txn_abort(txn);
+        throw0(DB_ERROR(lmdb_error("Error adding article to db transaction: ", result).c_str()));
+    }
+
+    result = mdb_txn_commit(txn);
+    if (result)
+        throw0(DB_ERROR(lmdb_error("Failed to commit txn for adding article: ", result).c_str()));
+}
+
+bool BlockchainLMDB::get_article(const crypto::hash& article_hash, std::string& content) const
+{
+    LOG_PRINT_L3("BlockchainLMDB::" << __func__);
+    check_open();
+    
+    MDB_txn *txn;
+    int result = mdb_txn_begin(m_env, NULL, MDB_RDONLY, &txn);
+    if (result)
+        throw0(DB_ERROR(lmdb_error("Failed to create a transaction for the db: ", result).c_str()));
+    
+    MDB_val key = {sizeof(article_hash), (void *)&article_hash};
+    MDB_val val;
+    
+    result = mdb_get(txn, m_articles, &key, &val);
+    mdb_txn_abort(txn);
+    
+    if (result == MDB_NOTFOUND)
+        return false;
+    else if (result)
+        throw0(DB_ERROR(lmdb_error("Error attempting to retrieve article from db: ", result).c_str()));
+
+    content.assign(reinterpret_cast<const char*>(val.mv_data), val.mv_size);
+    return true;
+}
+
 uint64_t BlockchainLMDB::add_transaction_data(const crypto::hash& blk_hash, const transaction& tx, const crypto::hash& tx_hash, const crypto::hash& tx_prunable_hash)
 {
   LOG_PRINT_L3("BlockchainLMDB::" << __func__);
@@ -1324,7 +1379,7 @@ void BlockchainLMDB::open(const std::string& filename, const int db_flags)
   // set up lmdb environment
   if ((result = mdb_env_create(&m_env)))
     throw0(DB_ERROR(lmdb_error("Failed to create lmdb environment: ", result).c_str()));
-  if ((result = mdb_env_set_maxdbs(m_env, 20)))
+  if ((result = mdb_env_set_maxdbs(m_env, 22)))
     throw0(DB_ERROR(lmdb_error("Failed to set max number of dbs: ", result).c_str()));
 
   int threads = tools::get_max_concurrency();
@@ -1397,6 +1452,7 @@ void BlockchainLMDB::open(const std::string& filename, const int db_flags)
 
   lmdb_db_open(txn, LMDB_SPENT_KEYS, MDB_INTEGERKEY | MDB_CREATE | MDB_DUPSORT | MDB_DUPFIXED, m_spent_keys, "Failed to open db handle for m_spent_keys");
 
+  lmdb_db_open(txn, LMDB_ARTICLES, MDB_CREATE, m_articles, "Failed to open db handle for m_articles");
   lmdb_db_open(txn, LMDB_TXPOOL_META, MDB_CREATE, m_txpool_meta, "Failed to open db handle for m_txpool_meta");
   lmdb_db_open(txn, LMDB_TXPOOL_BLOB, MDB_CREATE, m_txpool_blob, "Failed to open db handle for m_txpool_blob");
 
@@ -1411,6 +1467,7 @@ void BlockchainLMDB::open(const std::string& filename, const int db_flags)
   lmdb_db_open(txn, LMDB_FULL_NODE_DATA, MDB_INTEGERKEY | MDB_CREATE, m_full_node_data, "Failed to open db handle for m_full_node_data");
 
   lmdb_db_open(txn, LMDB_PROPERTIES, MDB_CREATE, m_properties, "Failed to open db handle for m_properties");
+
 
   mdb_set_dupsort(txn, m_spent_keys, compare_hash32);
   mdb_set_dupsort(txn, m_block_heights, compare_hash32);
@@ -1745,6 +1802,27 @@ void BlockchainLMDB::add_txpool_tx(const crypto::hash &txid, const cryptonote::b
   }
 }
 
+bool BlockchainLMDB::has_article(const crypto::hash& article_hash) const
+{
+    LOG_PRINT_L3("BlockchainLMDB::" << __func__);
+    check_open();
+
+    TXN_PREFIX_RDONLY();
+    RCURSOR(articles);
+
+    MDB_val key = {sizeof(article_hash), (void *)&article_hash};
+    MDB_val val;
+
+    int result = mdb_cursor_get(m_cur_articles, &key, &val, MDB_SET);
+    TXN_POSTFIX_RDONLY();
+
+    if (result == MDB_NOTFOUND)
+        return false;
+    else if (result)
+        throw0(DB_ERROR(lmdb_error("Error attempting to retrieve article from db: ", result).c_str()));
+
+    return true;
+}
 void BlockchainLMDB::update_txpool_tx(const crypto::hash &txid, const txpool_tx_meta_t &meta)
 {
   LOG_PRINT_L3("BlockchainLMDB::" << __func__);

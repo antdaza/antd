@@ -590,6 +590,29 @@ namespace cryptonote
   {
     return get_tx_pub_key_from_extra(tx.extra, pk_index);
   }
+  //-----------------------------------------------------------------
+   article_metadata set_article_to_tx_extra(const std::string& title, const std::string& content, const std::string& publisher)
+  {
+    article_metadata result;
+    result.success = false;
+
+    // Calculate content hash
+    cn_fast_hash(content.data(), content.size(), result.content_hash);
+    std::string content_hash_hex = epee::string_tools::pod_to_hex(result.content_hash);
+
+    // Prepare metadata for tx_extra
+    std::ostringstream oss;
+    oss << "TITLE:" << title << ";CONTENT_HASH:" << content_hash_hex << ";PUBLISHER:" << publisher;
+    result.serialized_blob = oss.str();
+
+    if (result.serialized_blob.size() > 255 - 4) { // Account for ARTC prefix
+        result.error = "Serialized article data too large for tx_extra";
+        return result;
+    }
+
+    result.success = true;
+    return result;
+  }
   //---------------------------------------------------------------
   static void add_data_to_tx_extra(std::vector<uint8_t>& tx_extra, char const *data, size_t data_size, uint8_t tag)
   {

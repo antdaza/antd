@@ -170,6 +170,8 @@ namespace cryptonote
         MAP_JON_RPC_WE("get_all_full_nodes",                  on_get_all_full_nodes, COMMAND_RPC_GET_FULL_NODES)
         MAP_JON_RPC_WE("get_all_full_nodes_keys",             on_get_all_full_nodes_keys, COMMAND_RPC_GET_ALL_FULL_NODES_KEYS)
         MAP_JON_RPC_WE("get_staking_requirement",                on_get_staking_requirement, COMMAND_RPC_GET_STAKING_REQUIREMENT)
+        MAP_JON_RPC_WE("store_article", on_store_article, COMMAND_RPC_STORE_ARTICLE)
+        MAP_JON_RPC_WE("get_article", on_get_article, COMMAND_RPC_GET_ARTICLE)
       END_JSON_RPC_MAP()
     END_URI_MAP2()
 
@@ -211,8 +213,11 @@ namespace cryptonote
     //
     // Antd
     //
+    bool on_store_article(const COMMAND_RPC_STORE_ARTICLE::request& req, COMMAND_RPC_STORE_ARTICLE::response& res, epee::json_rpc::error& error_resp, const connection_context *ctx);
     bool on_get_output_blacklist_bin(const COMMAND_RPC_GET_OUTPUT_BLACKLIST::request& req, COMMAND_RPC_GET_OUTPUT_BLACKLIST::response& res, const connection_context *ctx = NULL);
-
+    //bool on_store_article(const COMMAND_RPC_STORE_ARTICLE::request& req, COMMAND_RPC_STORE_ARTICLE::response& res, const connection_context *ctx = NULL);
+    bool on_get_article(const COMMAND_RPC_GET_ARTICLE::request& req, COMMAND_RPC_GET_ARTICLE::response& res, epee::json_rpc::error& error_resp, const connection_context *ctx);
+    //bool on_get_article(const COMMAND_RPC_GET_ARTICLE::request& req, COMMAND_RPC_GET_ARTICLE::response& res, const connection_context *ctx = NULL);
     //json_rpc
     bool on_getblockcount(const COMMAND_RPC_GETBLOCKCOUNT::request& req, COMMAND_RPC_GETBLOCKCOUNT::response& res, const connection_context *ctx = NULL);
     bool on_getblockhash(const COMMAND_RPC_GETBLOCKHASH::request& req, COMMAND_RPC_GETBLOCKHASH::response& res, epee::json_rpc::error& error_resp, const connection_context *ctx = NULL);

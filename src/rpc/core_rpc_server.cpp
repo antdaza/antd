@@ -1232,6 +1232,43 @@ namespace cryptonote
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_store_article(const COMMAND_RPC_STORE_ARTICLE::request& req, COMMAND_RPC_STORE_ARTICLE::response& res, epee::json_rpc::error& error_resp, const connection_context *ctx) {
+    crypto::hash content_hash;
+    if (!epee::string_tools::hex_to_pod(req.content_hash, content_hash)) {
+        res.status = "Invalid content hash format";
+        return true;
+    }
+
+    try {
+        m_core.get_blockchain_storage().get_db().add_article(content_hash, req.content);
+        res.status = "OK";
+    } catch (const std::exception& e) {
+        res.status = std::string("Error: ") + e.what();
+    }
+    return true;
+  }
+  //-------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_get_article(const COMMAND_RPC_GET_ARTICLE::request& req, COMMAND_RPC_GET_ARTICLE::response& res, epee::json_rpc::error& error_resp, const connection_context *ctx)
+  {
+    crypto::hash content_hash;
+    if (!epee::string_tools::hex_to_pod(req.content_hash, content_hash)) {
+        res.status = "Invalid content hash format";
+        return true;
+    }
+
+    try {
+        if (m_core.get_blockchain_storage().get_db().get_article(content_hash, res.content)) {
+            res.status = "OK";
+        } else {
+            res.status = "Article not found";
+        }
+    } catch (const std::exception& e) {
+        res.status = std::string("Error: ") + e.what();
+    }
+    return true;
+  }
+  //---------------------------------------------------------------------------------------
+
   bool core_rpc_server::on_submitblock(const COMMAND_RPC_SUBMITBLOCK::request& req, COMMAND_RPC_SUBMITBLOCK::response& res, epee::json_rpc::error& error_resp, const connection_context *ctx)
   {
     PERF_TIMER(on_submitblock);

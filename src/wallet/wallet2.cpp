@@ -1540,6 +1540,27 @@ void wallet2::cache_tx_data(const cryptonote::transaction& tx, const crypto::has
     }
   }
 }
+//---------------------------------------------------------------------------------------------------
+bool wallet2::get_article(const crypto::hash& content_hash, std::string& article_content)
+{
+    cryptonote::COMMAND_RPC_GET_ARTICLE::request req;
+    cryptonote::COMMAND_RPC_GET_ARTICLE::response res;
+    
+    req.content_hash = epee::string_tools::pod_to_hex(content_hash);
+
+    if (!invoke_http_json("/get_article", req, res)) {
+        LOG_ERROR("Failed to invoke get_article RPC");
+        return false;
+    }
+
+    if (res.status != "OK") {
+        LOG_ERROR("Failed to get article: " << res.status);
+        return false;
+    }
+
+    article_content = res.content;
+    return true;
+}
 //----------------------------------------------------------------------------------------------------
 void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote::transaction& tx, const std::vector<uint64_t> &o_indices, uint64_t height, uint64_t ts, bool miner_tx, bool pool, bool double_spend_seen, const tx_cache_data &tx_cache_data, std::map<std::pair<uint64_t, uint64_t>, size_t> *output_tracker_cache)
 {

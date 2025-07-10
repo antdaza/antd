@@ -259,6 +259,7 @@ namespace
   const char* USAGE_PRINT_LOCKED_STAKES("print_locked_stakes");
   const char* USAGE_ADD_ARTICLE("add_article <title>  <content> <pulish> 44Affq... 0.001");
   const char* USAGE_SHOW_ARTICLES("show_articles");
+  const char* USAGE_GET_ARTICLES("get_articles");
 
 #if defined (ANTD_ENABLE_INTEGRATION_TEST_HOOKS)
   std::string input_line(const std::string& prompt, bool yesno = false)
@@ -2985,6 +2986,10 @@ simple_wallet::simple_wallet()
   //
   // Antd
   //
+  m_cmd_binder.set_handler("get_article",
+                           boost::bind(&simple_wallet::get_article, this, _1),
+                           tr(USAGE_GET_ARTICLES),
+                           tr("Get articles"));
   m_cmd_binder.set_handler("show_articles",
                            boost::bind(&simple_wallet::show_articles, this, _1),
                            tr(USAGE_SHOW_ARTICLES),
@@ -5717,48 +5722,6 @@ bool simple_wallet::locked_transfer(const std::vector<std::string> &args_)
   transfer_main(TransferLocked, args_, false);
   return true;
 }
-
-//----------------------------------------------------------------------------------------------------
-static bool set_article_to_tx_extra(std::vector<uint8_t>& extra, const std::string& title, const std::string& content, const std::string& publisher)
-{
-    LOG_PRINT_L0("Starting set_article_to_tx_extra, title size: " << title.size() << ", content size: " << content.size() << ", publisher size: " << publisher.size());
-
-    crypto::hash content_hash;
-    cn_fast_hash(content.data(), content.size(), content_hash);
-    std::string content_hash_hex = epee::string_tools::pod_to_hex(content_hash);
-    message_writer() << tr("Content hash: ") << content_hash_hex;
-
-    // Store content off-chain
-    std::string filename = content_hash_hex + ".txt";
-    std::ofstream file(filename);
-    if (!file) {
-        fail_msg_writer() << tr("Failed to open file for content storage: ") << filename;
-        return false;
-    }
-    file << content;
-    file.close();
-    message_writer() << tr("Stored content in file: ") << filename;
-
-    std::ostringstream oss;
-    oss << "TITLE:" << title << ";CONTENT_HASH:" << content_hash_hex << ";PUBLISHER:" << publisher;
-    std::string blob = oss.str();
-
-    LOG_PRINT_L0("Serialized data size: " << blob.size());
-
-    if (blob.size() > 255 - 4) { // Account for ARTC prefix
-        fail_msg_writer() << tr("Serialized article data too large for tx_extra: ") << blob.size() << tr(" bytes");
-        return false;
-    }
-
-    std::string extra_nonce = "ARTC" + blob; // Match working version's prefix
-    if (!add_extra_nonce_to_tx_extra(extra, extra_nonce)) {
-        fail_msg_writer() << tr("Failed to add article metadata to tx_extra");
-        return false;
-    }
-
-    message_writer() << tr("Serialized article data, size: ") << extra_nonce.size();
-    return true;
-}
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::article_main(int transfer_type, const std::vector<std::string>& args_, bool called_by_mms)
 {
@@ -5813,11 +5776,21 @@ bool simple_wallet::article_main(int transfer_type, const std::vector<std::strin
         return false;
     }
 
-    std::vector<uint8_t> extra;
-    if (!set_article_to_tx_extra(extra, title, content, publisher)) {
-        fail_msg_writer() << "Failed to encode article metadata into tx_extra.";
+std::vector<uint8_t> extra;
+    article_metadata article_meta = set_article_to_tx_extra(title, content, publisher);
+    if (!article_meta.success) {
+        fail_msg_writer() << "Failed to process article: " << article_meta.error;
         return false;
     }
+
+    message_writer() << tr("Article content stored in blockchain database with hash: ") 
+                     << epee::string_tools::pod_to_hex(article_meta.content_hash);
+
+std::string extra_nonce = "ARTC" + article_meta.serialized_blob;
+if (!add_extra_nonce_to_tx_extra(extra, extra_nonce)) {
+    fail_msg_writer() << tr("Failed to add article metadata to tx_extra");
+    return false;
+}
 
     std::set<uint32_t> subaddr_indices;
     if (local_args.size() > 0 && local_args[0].substr(0, 6) == "index=") {
@@ -6207,6 +6180,32 @@ static bool get_tx_extra_nonce(const std::vector<uint8_t>& extra, std::string& n
     return false;
   }
 //-------------------------------------------
+bool simple_wallet::get_article(const std::vector<std::string>& args)
+{
+    if (args.size() != 1) {
+        fail_msg_writer() << "Usage: get_article <content_hash>";
+        return false;
+    }
+
+    crypto::hash content_hash;
+    if (!epee::string_tools::hex_to_pod(args[0], content_hash)) {
+        fail_msg_writer() << "Invalid content hash format";
+        return false;
+    }
+
+    std::string content;
+    if (!m_wallet->get_article(content_hash, content)) {
+        fail_msg_writer() << "Failed to retrieve article";
+        return false;
+    }
+
+    // Display the content
+    message_writer() << "Article content:";
+    message_writer() << content;
+
+    return true;
+}
+//-------------------------------------------
 static std::string get_article_metadata(const std::vector<uint8_t>& extra)
 {
   std::string extra_nonce;
@@ -6227,30 +6226,23 @@ static std::string get_article_metadata(const std::vector<uint8_t>& extra)
 //-------------------------------------------
 bool cryptonote::simple_wallet::show_articles(const std::vector<std::string>& args)
 {
-    const std::string prefix = "ARTC";
+    static constexpr const char* PREFIX = "ARTC";
     bool found = false;
 
-    // Helper to extract ARTC blob
-    auto get_article_metadata = [prefix](const std::vector<uint8_t>& extra) -> std::string {
+    // Extract article metadata blob from tx_extra
+    auto extract_article_blob = [](const std::vector<uint8_t>& extra) -> std::string {
         std::string extra_nonce;
-        if (!get_tx_extra_nonce(extra, extra_nonce))
-            return {};
-
-        if (extra_nonce.size() < prefix.size())
-            return {};
-
-        if (extra_nonce.compare(0, prefix.size(), prefix) != 0)
-            return {};
-
-        return extra_nonce.substr(prefix.size()); // Skip "ARTC"
+        if (!get_tx_extra_nonce(extra, extra_nonce)) return {};
+        if (extra_nonce.compare(0, strlen(PREFIX), PREFIX) != 0) return {};
+        return extra_nonce.substr(strlen(PREFIX));
     };
 
-    // Helper to read content from file
-    auto read_content_from_file = [](const std::string& content_hash_hex) -> std::string {
-        std::string filename = content_hash_hex + ".txt";
+    // Read full content from local file
+    auto load_content_from_file = [](const std::string& content_hash_hex) -> std::string {
+        const std::string filename = content_hash_hex + ".txt";
         std::ifstream file(filename);
         if (!file) {
-            return "Error: Content file not found (" + filename + ")";
+            return "[Error: Content file not found: " + filename + "]";
         }
 
         std::stringstream buffer;
@@ -6258,49 +6250,49 @@ bool cryptonote::simple_wallet::show_articles(const std::vector<std::string>& ar
         return buffer.str();
     };
 
-    // Print a parsed article line
-    auto print_article = [this, &read_content_from_file](const std::string& blob, const crypto::hash& txid) {
-        std::string title, content_hash_hex, publisher;
-        size_t t_pos = blob.find("TITLE:");
-        size_t c_pos = blob.find(";CONTENT_HASH:");
-        size_t p_pos = blob.find(";PUBLISHER:");
+    // Parse and print article info
+    auto display_article = [this, &load_content_from_file](const std::string& blob, const crypto::hash& txid) {
+        const std::string title_tag = "TITLE:";
+        const std::string content_hash_tag = ";CONTENT_HASH:";
+        const std::string publisher_tag = ";PUBLISHER:";
 
-        if (t_pos != 0 || c_pos == std::string::npos || p_pos == std::string::npos || c_pos < 6 || p_pos < c_pos + 13) {
-            message_writer() << "Malformed article in tx: " << epee::string_tools::pod_to_hex(txid);
+        size_t t_pos = blob.find(title_tag);
+        size_t c_pos = blob.find(content_hash_tag);
+        size_t p_pos = blob.find(publisher_tag);
+
+        if (t_pos != 0 || c_pos == std::string::npos || p_pos == std::string::npos || c_pos < t_pos + title_tag.length()) {
+            message_writer() << "Malformed article metadata in txid: " << epee::string_tools::pod_to_hex(txid);
             return;
         }
 
-        title = blob.substr(6, c_pos - 6);
-        content_hash_hex = blob.substr(c_pos + 13, p_pos - (c_pos + 13));
-        publisher = blob.substr(p_pos + 11);
+        std::string title = blob.substr(t_pos + title_tag.length(), c_pos - (t_pos + title_tag.length()));
+        std::string content_hash_hex = blob.substr(c_pos + content_hash_tag.length(), p_pos - (c_pos + content_hash_tag.length()));
+        std::string publisher = blob.substr(p_pos + publisher_tag.length());
 
-        // Load content from file
-        std::string content = read_content_from_file(content_hash_hex);
+        std::string content = load_content_from_file(content_hash_hex);
 
-        message_writer() << "\nArticle from txid: " << epee::string_tools::pod_to_hex(txid);
-        message_writer() << "  Title    : " << title;
-        message_writer() << "  Content  : " << content;
-        message_writer() << "  Content Hash: " << content_hash_hex;
-        message_writer() << "  Publisher: " << publisher;
+        message_writer() << "\n📰 Article Found in TxID: " << epee::string_tools::pod_to_hex(txid);
+        message_writer() << "  📌 Title       : " << title;
+        message_writer() << "  🧾 Content     : " << content;
+        message_writer() << "  🔑 Content Hash: " << content_hash_hex;
+        message_writer() << "  ✍️ Publisher   : " << publisher;
     };
 
-    // Scan Incoming and Outgoing Transfers
+    // Fetch wallet transfers (incoming/outgoing)
     tools::wallet2::transfer_container transfers;
-    m_wallet->get_transfers(transfers); // Get both incoming and outgoing
+    m_wallet->get_transfers(transfers);
 
-    for (const auto& entry : transfers) {
-        const tools::wallet2::transfer_details& td = entry;
-        const cryptonote::transaction_prefix& tx = td.m_tx; // Use transaction_prefix
-
-        std::string blob = get_article_metadata(tx.extra);
-        if (!blob.empty()) {
-            print_article(blob, td.m_txid);
+    for (const auto& td : transfers) {
+        const cryptonote::transaction_prefix& tx = td.m_tx;
+        std::string article_blob = extract_article_blob(tx.extra);
+        if (!article_blob.empty()) {
+            display_article(article_blob, td.m_txid);
             found = true;
         }
     }
 
     if (!found) {
-        message_writer() << "No articles found in wallet transfer history.";
+        message_writer() << "No articles with metadata found in wallet transfer history.";
     }
 
     return true;

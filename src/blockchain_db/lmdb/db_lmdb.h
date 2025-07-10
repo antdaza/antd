@@ -51,6 +51,8 @@ typedef struct mdb_txn_cursors
   MDB_cursor *m_txc_block_heights;
   MDB_cursor *m_txc_block_info;
 
+  MDB_cursor *m_txc_articles;
+
   MDB_cursor *m_txc_output_txs;
   MDB_cursor *m_txc_output_amounts;
 
@@ -78,6 +80,7 @@ typedef struct mdb_txn_cursors
 #define m_cur_block_heights	m_cursors->m_txc_block_heights
 #define m_cur_block_info	m_cursors->m_txc_block_info
 #define m_cur_output_txs	m_cursors->m_txc_output_txs
+#define m_cur_articles          m_cursors->m_txc_articles
 #define m_cur_output_amounts	m_cursors->m_txc_output_amounts
 #define m_cur_output_blacklist	m_cursors->m_txc_output_blacklist
 #define m_cur_txs	m_cursors->m_txc_txs
@@ -93,6 +96,7 @@ typedef struct mdb_txn_cursors
 #define m_cur_hf_versions	m_cursors->m_txc_hf_versions
 #define m_cur_full_node_data	m_cursors->m_txc_full_node_data
 #define m_cur_properties	m_cursors->m_txc_properties
+
 
 typedef struct mdb_rflags
 {
@@ -116,6 +120,7 @@ typedef struct mdb_rflags
   bool m_rf_hf_versions;
   bool m_rf_full_node_data;
   bool m_rf_properties;
+  bool m_rf_articles;
 } mdb_rflags;
 
 typedef struct mdb_threadinfo
@@ -224,6 +229,11 @@ public:
   virtual uint64_t get_top_block_timestamp() const;
 
   virtual size_t get_block_weight(const uint64_t& height) const;
+
+    // Article storage methods
+  virtual void add_article(const crypto::hash& article_hash, const std::string& content) override;
+  virtual bool get_article(const crypto::hash& article_hash, std::string& content) const override;
+  virtual bool has_article(const crypto::hash& article_hash) const override;
 
   virtual difficulty_type get_block_cumulative_difficulty(const uint64_t& height) const;
 
@@ -463,6 +473,7 @@ private:
 
   MDB_dbi m_properties;
 
+  MDB_dbi m_articles;
   mutable uint64_t m_cum_size;	// used in batch size estimation
   mutable unsigned int m_cum_count;
   std::string m_folder;

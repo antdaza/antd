@@ -345,6 +345,7 @@ namespace tools
       END_SERIALIZE()
     };
 
+   bool get_article(const crypto::hash& content_hash, std::string& article_content);
     struct payment_details
     {
       crypto::hash m_tx_hash;
