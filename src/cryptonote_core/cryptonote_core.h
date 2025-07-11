@@ -609,6 +609,7 @@ namespace cryptonote
       */
      Blockchain& get_blockchain_storage(){return m_blockchain_storage;}
 
+    void add_article(const crypto::hash& article_hash, const std::string& content);
      /**
       * @brief gets the Blockchain instance (const)
       *

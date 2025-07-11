@@ -899,6 +899,19 @@ namespace cryptonote
     return true;
   }
   //-----------------------------------------------------------------------------------------------
+  void core::add_article(const crypto::hash& article_hash, const std::string& content)
+  {
+    try
+    {
+      m_blockchain_storage.add_article(article_hash, content);
+    }
+    catch (const std::exception& e)
+    {
+      throw std::runtime_error(std::string("Failed to store article in blockchain database: ") + e.what());
+    }
+  }
+  //------------------------------------------------------------------------------------------------
+  //-----------------------------------------------------------------------------------------------
   void core::set_semantics_failed(const crypto::hash &tx_hash)
   {
     LOG_PRINT_L1("WRONG TRANSACTION BLOB, Failed to check tx " << tx_hash << " semantic, rejected");

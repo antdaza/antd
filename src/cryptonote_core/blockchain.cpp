@@ -278,6 +278,18 @@ uint64_t Blockchain::get_current_blockchain_height() const
   return m_db->height();
 }
 //------------------------------------------------------------------
+  void Blockchain::add_article(const crypto::hash& article_hash, const std::string& content)
+  {
+    try
+    {
+      m_db->add_article(article_hash, content);
+    }
+    catch (const std::exception& e)
+    {
+      throw std::runtime_error(std::string("Failed to add article to database: ") + e.what());
+    }
+  }
+//------------------------------------------------------------------
 //FIXME: possibly move this into the constructor, to avoid accidentally
 //       dereferencing a null BlockchainDB pointer
 bool Blockchain::init(BlockchainDB* db, const network_type nettype, bool offline, const cryptonote::test_options *test_options, difficulty_type fixed_difficulty, const GetCheckpointsCallback& get_checkpoints/* = nullptr*/)

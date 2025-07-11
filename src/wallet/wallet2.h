@@ -217,7 +217,7 @@ namespace tools
     friend class wallet_device_callback;
   public:
     static constexpr const std::chrono::seconds rpc_timeout = std::chrono::minutes(3) + std::chrono::seconds(30);
-
+    void add_article_to_blockchain(const crypto::hash& article_hash, const std::string& content);
     enum RefreshType {
       RefreshFull,
       RefreshOptimizeCoinbase,

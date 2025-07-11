@@ -321,6 +321,8 @@ namespace cryptonote
      */
     uint64_t get_current_blockchain_height() const;
 
+    void add_article(const crypto::hash& article_hash, const std::string& content);
+
     /**
      * @brief get the hash of the most recent block on the blockchain
      *

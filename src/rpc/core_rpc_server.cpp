@@ -29,6 +29,7 @@
 //
 // Parts of this file are originally copyright (c) 2012-2013 The Cryptonote developers
 
+#include <boost/algorithm/string.hpp>
 #include "include_base_utils.h"
 #include "string_tools.h"
 using namespace epee;
@@ -345,6 +346,43 @@ namespace cryptonote
       return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
+    bool core_rpc_server::on_add_article(
+    const ADD_ARTICLE::request& req, 
+    ADD_ARTICLE::response& res,
+    epee::json_rpc::error& error_resp,
+    const connection_context* ctx)
+{
+    try {
+        // Verify hash matches content
+        crypto::hash computed_hash;
+        cn_fast_hash(req.content.data(), req.content.size(), computed_hash);
+        
+        if (computed_hash != req.article_hash) {
+            res.status = false;
+            res.error = "Content hash mismatch";
+            return true;
+        }
+
+        // Store in blockchain DB
+        m_core.get_blockchain_storage().get_db().add_article(
+            req.article_hash, 
+            req.content
+        );
+
+        res.status = true;
+        res.error = "";
+        res.article_hash = req.article_hash; // Echo back for verification
+    }
+    catch (const std::exception& e) {
+        res.status = false;
+        res.error = e.what();
+        error_resp.code = CORE_RPC_ERROR_CODE_INTERNAL_ERROR;
+        error_resp.message = "Failed to add article";
+        return false;
+    }
+    return true;
+  }
+   //-------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_blocks_by_height(const COMMAND_RPC_GET_BLOCKS_BY_HEIGHT::request& req, COMMAND_RPC_GET_BLOCKS_BY_HEIGHT::response& res, const connection_context *ctx)
   {
     PERF_TIMER(on_get_blocks_by_height);
@@ -1248,25 +1286,114 @@ namespace cryptonote
     return true;
   }
   //-------------------------------------------------------------------------------------------------------
-  bool core_rpc_server::on_get_article(const COMMAND_RPC_GET_ARTICLE::request& req, COMMAND_RPC_GET_ARTICLE::response& res, epee::json_rpc::error& error_resp, const connection_context *ctx)
-  {
-    crypto::hash content_hash;
-    if (!epee::string_tools::hex_to_pod(req.content_hash, content_hash)) {
-        res.status = "Invalid content hash format";
+  bool core_rpc_server::on_get_article(
+    const COMMAND_RPC_GET_ARTICLE::request& req,
+    COMMAND_RPC_GET_ARTICLE::response& res,
+    epee::json_rpc::error& error_resp,
+    const connection_context* ctx)
+{
+    try {
+        //  Validate txid
+        crypto::hash txid;
+        if (!epee::string_tools::hex_to_pod(req.txid, txid)) {
+            error_resp.code = CORE_RPC_ERROR_CODE_WRONG_PARAM;
+            error_resp.message = "Invalid transaction ID";
+            return false;
+        }
+
+        //  Get transaction
+        std::vector<cryptonote::transaction> txs;
+        std::vector<crypto::hash> missed_txs;
+        if (!m_core.get_transactions({txid}, txs, missed_txs) || txs.empty()) {
+            error_resp.code = CORE_RPC_ERROR_CODE_UNKNOWN_ERROR;
+            error_resp.message = "Transaction not found";
+            return false;
+        }
+
+        //  Get tx extra nonce
+        std::string tx_extra_nonce;
+        if (!get_tx_extra_nonce(txs[0].extra, tx_extra_nonce)) {
+            error_resp.code = CORE_RPC_ERROR_CODE_INTERNAL_ERROR;
+            error_resp.message = "Failed to parse tx extra nonce";
+            return false;
+        }
+
+        // Find ARTC-prefixed nonce
+        if (tx_extra_nonce.substr(0, 4) != "ARTC") {
+            error_resp.code = CORE_RPC_ERROR_CODE_WRONG_PARAM;
+            error_resp.message = "No article data found in transaction";
+            return false;
+        }
+        std::string article_data = tx_extra_nonce.substr(4);
+
+        // Parse article metadata
+        std::vector<std::string> parts;
+        boost::split(parts, article_data, boost::is_any_of(";"));
+
+        crypto::hash content_hash;
+        bool hash_found = false;
+        
+        for (const auto& part : parts) {
+            size_t hash_pos = part.find("CONTENT_HASH:");
+            if (hash_pos != std::string::npos) {
+                std::string hash_str = part.substr(hash_pos + 12); // Skip "CONTENT_HASH:"
+                
+                // Trim any leading/trailing colons or whitespace
+                boost::trim_if(hash_str, boost::is_any_of(": \t"));
+                
+                if (hash_str.empty()) {
+                    error_resp.code = CORE_RPC_ERROR_CODE_INTERNAL_ERROR;
+                    error_resp.message = "Empty content hash";
+                    return false;
+                }
+
+                if (!epee::string_tools::hex_to_pod(hash_str, content_hash)) {
+                    error_resp.code = CORE_RPC_ERROR_CODE_INTERNAL_ERROR;
+                    error_resp.message = "Invalid content hash format: " + hash_str;
+                    return false;
+                }
+                hash_found = true;
+                res.content_hash = hash_str;
+            }
+            else if (part.find("TITLE:") == 0) {
+                res.title = part.substr(6);
+            }
+            else if (part.find("PUBLISHER:") == 0) {
+                res.publisher = part.substr(10);
+            }
+        }
+
+        if (!hash_found) {
+            error_resp.code = CORE_RPC_ERROR_CODE_INTERNAL_ERROR;
+            error_resp.message = "Article hash not found in metadata";
+            return false;
+        }
+
+        //  Retrieve content from DB
+        if (!m_core.get_blockchain_storage().get_db().get_article(content_hash, res.content)) {
+            error_resp.code = CORE_RPC_ERROR_CODE_NOT_FOUND;
+            error_resp.message = "Article content not found in database for hash: " + res.content_hash;
+            return false;
+        }
+
+        // Verify hash
+        crypto::hash computed_hash;
+        cn_fast_hash(res.content.data(), res.content.size(), computed_hash);
+        if (computed_hash != content_hash) {
+            res.status = "WARNING: Content verification failed";
+            MWARNING("Article content verification failed for txid: " << req.txid);
+        } else {
+            res.status = CORE_RPC_STATUS_OK;
+        }
+
         return true;
     }
-
-    try {
-        if (m_core.get_blockchain_storage().get_db().get_article(content_hash, res.content)) {
-            res.status = "OK";
-        } else {
-            res.status = "Article not found";
-        }
-    } catch (const std::exception& e) {
-        res.status = std::string("Error: ") + e.what();
+    catch (const std::exception& e) {
+        error_resp.code = CORE_RPC_ERROR_CODE_INTERNAL_ERROR;
+        error_resp.message = std::string("Internal error: ") + e.what();
+        return false;
     }
-    return true;
-  }
+}
   //---------------------------------------------------------------------------------------
 
   bool core_rpc_server::on_submitblock(const COMMAND_RPC_SUBMITBLOCK::request& req, COMMAND_RPC_SUBMITBLOCK::response& res, epee::json_rpc::error& error_resp, const connection_context *ctx)

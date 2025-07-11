@@ -5783,6 +5783,25 @@ std::vector<uint8_t> extra;
         return false;
     }
 
+    // Store article metadata in the blockchain database
+    {
+        cryptonote::ADD_ARTICLE::request add_article_req = {};
+        cryptonote::ADD_ARTICLE::response add_article_res = {};
+        
+        add_article_req.article_hash = article_meta.content_hash;
+        add_article_req.content = content;
+
+        if (!m_wallet->invoke_http_json_rpc("/json_rpc", "add_article", add_article_req, add_article_res)) {
+            fail_msg_writer() << tr("Failed to invoke article storage RPC");
+            return false;
+        }
+
+        if (!add_article_res.status) {
+            fail_msg_writer() << tr("Failed to store article: ") << add_article_res.error;
+            return false;
+        }
+    }
+
     message_writer() << tr("Article content stored in blockchain database with hash: ") 
                      << epee::string_tools::pod_to_hex(article_meta.content_hash);
 
@@ -6165,7 +6184,7 @@ bool simple_wallet::add_article(const std::vector<std::string> &args_)
   return true;
 }
 //-------------------------------------------
-static bool get_tx_extra_nonce(const std::vector<uint8_t>& extra, std::string& nonce)
+/*static bool get_tx_extra_nonce(const std::vector<uint8_t>& extra, std::string& nonce)
   {
     cryptonote::tx_extra_nonce extra_nonce;
     std::vector<cryptonote::tx_extra_field> tx_extra_fields;
@@ -6178,7 +6197,7 @@ static bool get_tx_extra_nonce(const std::vector<uint8_t>& extra, std::string& n
       return true;
     }
     return false;
-  }
+  }*/
 //-------------------------------------------
 bool simple_wallet::get_article(const std::vector<std::string>& args)
 {

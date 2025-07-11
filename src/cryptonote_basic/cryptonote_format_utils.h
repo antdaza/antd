@@ -39,6 +39,8 @@
 #include "crypto/hash.h"
 #include <unordered_map>
 
+#define TX_EXTRA_NONCE_ARTICLE_PREFIX "ARTC"
+
 namespace epee
 {
   class wipeable_string;
@@ -102,7 +104,11 @@ struct article_metadata {
 };
 
   article_metadata set_article_to_tx_extra(const std::string& title, const std::string& content, const std::string& publisher);
-
+  bool add_article_to_tx_extra(std::vector<uint8_t>& tx_extra,
+                           const std::string& title,
+                           const std::string& content,
+                           const std::string& publisher);
+  bool get_tx_extra_nonce(const std::vector<uint8_t>& extra, std::string& nonce);
   void add_full_node_winner_to_tx_extra(std::vector<uint8_t>& tx_extra, const crypto::public_key& winner);
   void add_full_node_pubkey_to_tx_extra(std::vector<uint8_t>& tx_extra, const crypto::public_key& pubkey);
   void add_full_node_contributor_to_tx_extra(std::vector<uint8_t>& tx_extra, const cryptonote::account_public_address& address);

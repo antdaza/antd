@@ -591,8 +591,10 @@ namespace cryptonote
     return get_tx_pub_key_from_extra(tx.extra, pk_index);
   }
   //-----------------------------------------------------------------
-   article_metadata set_article_to_tx_extra(const std::string& title, const std::string& content, const std::string& publisher)
-  {
+  article_metadata set_article_to_tx_extra(const std::string& title, 
+                                       const std::string& content,
+                                       const std::string& publisher)
+{
     article_metadata result;
     result.success = false;
 
@@ -600,20 +602,41 @@ namespace cryptonote
     cn_fast_hash(content.data(), content.size(), result.content_hash);
     std::string content_hash_hex = epee::string_tools::pod_to_hex(result.content_hash);
 
-    // Prepare metadata for tx_extra
+    // Prepare metadata - store both hash and content
     std::ostringstream oss;
-    oss << "TITLE:" << title << ";CONTENT_HASH:" << content_hash_hex << ";PUBLISHER:" << publisher;
+    oss << "TITLE:" << title 
+        << ";CONTENT_HASH:" << content_hash_hex
+  //      << ";CONTENT:" << content
+        << ";PUBLISHER:" << publisher;
+
     result.serialized_blob = oss.str();
 
-    if (result.serialized_blob.size() > 255 - 4) { // Account for ARTC prefix
-        result.error = "Serialized article data too large for tx_extra";
+    // Increased size limit
+    const size_t MAX_ARTICLE_SIZE = 3072; // 3KB
+    if (result.serialized_blob.size() > MAX_ARTICLE_SIZE) {
+        result.error = "Article data too large (max " + std::to_string(MAX_ARTICLE_SIZE) + " bytes)";
         return result;
     }
 
     result.success = true;
     return result;
-  }
+}
   //---------------------------------------------------------------
+   bool get_tx_extra_nonce(const std::vector<uint8_t>& extra, std::string& nonce)
+  {
+    cryptonote::tx_extra_nonce extra_nonce;
+    std::vector<cryptonote::tx_extra_field> tx_extra_fields;
+    if (!parse_tx_extra(extra, tx_extra_fields))
+      return false;
+
+    if (find_tx_extra_field_by_type(tx_extra_fields, extra_nonce))
+    {
+      nonce = extra_nonce.nonce;
+      return true;
+    }
+    return false;
+  }
+  //----------------------------------------------------------------
   static void add_data_to_tx_extra(std::vector<uint8_t>& tx_extra, char const *data, size_t data_size, uint8_t tag)
   {
     size_t pos = tx_extra.size();
@@ -693,6 +716,30 @@ namespace cryptonote
     return true;
   }
   //---------------------------------------------------------------
+  bool add_article_to_tx_extra(std::vector<uint8_t>& tx_extra, 
+                           const std::string& title,
+                           const std::string& content,
+                           const std::string& publisher)
+  {
+    // Prepare article metadata
+    article_metadata meta = set_article_to_tx_extra(title, content, publisher);
+    if (!meta.success) {
+        LOG_ERROR("Failed to prepare article: " << meta.error);
+        return false;
+    }
+
+    // Create the extra nonce string
+    std::string extra_nonce = TX_EXTRA_NONCE_ARTICLE_PREFIX + meta.serialized_blob;
+
+    // Add to tx_extra
+    if (!add_extra_nonce_to_tx_extra(tx_extra, extra_nonce)) {
+        LOG_ERROR("Failed to add article nonce to tx_extra");
+        return false;
+    }
+
+    return true;
+  }
+  //-----------------------------------------------
   bool add_full_node_deregister_to_tx_extra(std::vector<uint8_t>& tx_extra, const tx_extra_full_node_deregister& deregistration)
   {
     tx_extra_field field = tx_extra_full_node_deregister{deregistration.block_height, deregistration.full_node_index, deregistration.votes};

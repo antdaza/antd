@@ -1503,7 +1503,7 @@ void wallet2::scan_output(const cryptonote::transaction &tx, bool miner_tx, cons
   tx_scan_info.amount      = tx_scan_info.money_transfered;
   tx_scan_info.unlock_time = unlock_time;
 }
-//----------------------------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 void wallet2::cache_tx_data(const cryptonote::transaction& tx, const crypto::hash &txid, tx_cache_data &tx_cache_data) const
 {
   if(!parse_tx_extra(tx.extra, tx_cache_data.tx_extra_fields))
@@ -1541,25 +1541,58 @@ void wallet2::cache_tx_data(const cryptonote::transaction& tx, const crypto::has
   }
 }
 //---------------------------------------------------------------------------------------------------
-bool wallet2::get_article(const crypto::hash& content_hash, std::string& article_content)
+bool wallet2::get_article(const crypto::hash& txid, std::string& article_content)
 {
-    cryptonote::COMMAND_RPC_GET_ARTICLE::request req;
-    cryptonote::COMMAND_RPC_GET_ARTICLE::response res;
-    
-    req.content_hash = epee::string_tools::pod_to_hex(content_hash);
+    try {
+        // Prepare RPC request
+        cryptonote::COMMAND_RPC_GET_ARTICLE::request req = {};
+        cryptonote::COMMAND_RPC_GET_ARTICLE::response res = {};
+        
+        req.txid = epee::string_tools::pod_to_hex(txid);
+        req.decode_extra = true;  // Ensure we parse the extra data
 
-    if (!invoke_http_json("/get_article", req, res)) {
-        LOG_ERROR("Failed to invoke get_article RPC");
+        // Make RPC call
+        const bool r = invoke_http_json("/get_article", req, res);
+        if (!r) {
+            LOG_ERROR("Failed to invoke HTTP request to daemon");
+            return false;
+        }
+
+        // Check response status
+        if (res.status != CORE_RPC_STATUS_OK) {
+            LOG_ERROR("Daemon returned error status: " << res.status);
+            return false;
+        }
+
+        // Validate response
+        if (res.content.empty()) {
+            LOG_ERROR("Received empty article content");
+            return false;
+        }
+
+        // Optional: Verify content hash if needed
+        if (!res.content_hash.empty()) {
+            crypto::hash claimed_hash;
+            if (!epee::string_tools::hex_to_pod(res.content_hash, claimed_hash)) {
+                LOG_ERROR("Invalid content hash format in response");
+                return false;
+            }
+            
+            crypto::hash computed_hash;
+            cn_fast_hash(res.content.data(), res.content.size(), computed_hash);
+            if (claimed_hash != computed_hash) {
+                LOG_ERROR("Content hash verification failed");
+                return false;
+            }
+        }
+
+        article_content = std::move(res.content);
+        return true;
+    }
+    catch (const std::exception& e) {
+        LOG_ERROR("Exception in get_article: " << e.what());
         return false;
     }
-
-    if (res.status != "OK") {
-        LOG_ERROR("Failed to get article: " << res.status);
-        return false;
-    }
-
-    article_content = res.content;
-    return true;
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote::transaction& tx, const std::vector<uint64_t> &o_indices, uint64_t height, uint64_t ts, bool miner_tx, bool pool, bool double_spend_seen, const tx_cache_data &tx_cache_data, std::map<std::pair<uint64_t, uint64_t>, size_t> *output_tracker_cache)

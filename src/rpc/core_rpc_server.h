@@ -160,6 +160,7 @@ namespace cryptonote
         //
         // Antd
         //
+        MAP_JON_RPC_WE("add_article",                         on_add_article,     ADD_ARTICLE)
         MAP_JON_RPC_WE("get_quorum_state",                       on_get_quorum_state, COMMAND_RPC_GET_QUORUM_STATE)
         MAP_JON_RPC_WE("get_quorum_state_batched",               on_get_quorum_state_batched, COMMAND_RPC_GET_QUORUM_STATE_BATCHED)
         MAP_JON_RPC_WE("get_full_node_registration_cmd_raw",  on_get_full_node_registration_cmd_raw, COMMAND_RPC_GET_FULL_NODE_REGISTRATION_CMD_RAW)
@@ -213,6 +214,7 @@ namespace cryptonote
     //
     // Antd
     //
+    bool on_add_article(const ADD_ARTICLE::request& req, ADD_ARTICLE::response& res, epee::json_rpc::error& error_resp, const connection_context *ctx);
     bool on_store_article(const COMMAND_RPC_STORE_ARTICLE::request& req, COMMAND_RPC_STORE_ARTICLE::response& res, epee::json_rpc::error& error_resp, const connection_context *ctx);
     bool on_get_output_blacklist_bin(const COMMAND_RPC_GET_OUTPUT_BLACKLIST::request& req, COMMAND_RPC_GET_OUTPUT_BLACKLIST::response& res, const connection_context *ctx = NULL);
     //bool on_store_article(const COMMAND_RPC_STORE_ARTICLE::request& req, COMMAND_RPC_STORE_ARTICLE::response& res, const connection_context *ctx = NULL);

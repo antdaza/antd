@@ -2755,22 +2755,56 @@ struct COMMAND_RPC_STORE_ARTICLE {
 
 struct COMMAND_RPC_GET_ARTICLE {
     struct request {
-        std::string content_hash;
+        std::string txid;  // Transaction hash in hex
+        bool decode_extra; // Whether to parse extra data (default: true)
         
         BEGIN_KV_SERIALIZE_MAP()
-            KV_SERIALIZE(content_hash)
+            KV_SERIALIZE(txid)
+            KV_SERIALIZE(decode_extra)
         END_KV_SERIALIZE_MAP()
     };
-    
+
     struct response {
-        std::string content;
-        std::string status;
+        std::string status;       // "OK" or "Failed"
+        std::string title;        // Article title
+        std::string content;      // Article content
+        std::string publisher;    // Author/Publisher
+        std::string content_hash; // Hash of content
         
         BEGIN_KV_SERIALIZE_MAP()
-            KV_SERIALIZE(content)
             KV_SERIALIZE(status)
+            KV_SERIALIZE(title)
+            KV_SERIALIZE(content)
+            KV_SERIALIZE(publisher)
+            KV_SERIALIZE(content_hash)
         END_KV_SERIALIZE_MAP()
     };
 };
 
+ struct ADD_ARTICLE
+ {
+      struct request
+      {
+        crypto::hash article_hash;
+        std::string content;
+
+        BEGIN_KV_SERIALIZE_MAP()
+          KV_SERIALIZE_VAL_POD_AS_BLOB(article_hash)
+          KV_SERIALIZE(content)
+        END_KV_SERIALIZE_MAP()
+      };
+
+      struct response
+      {
+        bool status;
+        std::string error;
+        crypto::hash article_hash;
+
+        BEGIN_KV_SERIALIZE_MAP()
+          KV_SERIALIZE(status)
+          KV_SERIALIZE(error)
+          KV_SERIALIZE_VAL_POD_AS_BLOB(article_hash)
+        END_KV_SERIALIZE_MAP()
+      };
+    };
 }
