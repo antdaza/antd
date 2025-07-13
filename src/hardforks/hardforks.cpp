@@ -6,12 +6,12 @@
 
 
 const hardfork_t mainnet_hard_forks[] = {
-  { cryptonote::network_version_7, 1, 0, 1744823806 },
-  { cryptonote::network_version_8, 200, 0, 1744824295 },
-  { cryptonote::network_version_9_full_nodes, 300, 0, 1744825855 },
-  { cryptonote::network_version_10_bulletproofs, 400, 0, 1744826995 },
-  { cryptonote::network_version_11_infinite_staking, 450, 0, 1749055891 },
-  { cryptonote::network_version_12, 460, 0, 1749055991 }
+  { cryptonote::network_version_7, 1, 0, 1752288595 },
+  { cryptonote::network_version_8, 200, 0, 1752289000 },
+  { cryptonote::network_version_9_full_nodes, 300, 0, 1752289089 },
+  { cryptonote::network_version_10_bulletproofs, 400, 0, 1752289224 },
+  { cryptonote::network_version_11_infinite_staking, 450, 0, 1752289333 },
+  { cryptonote::network_version_12, 460, 0, 1752289444 }
 };
 
 const size_t num_mainnet_hard_forks = sizeof(mainnet_hard_forks) / sizeof(mainnet_hard_forks[0]);

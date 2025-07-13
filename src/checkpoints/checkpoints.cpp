@@ -204,7 +204,12 @@ if (!difficulty_str.empty())
         break;
       case MAINNET:
 #if !defined(ANTD_ENABLE_INTEGRATION_TEST_HOOKS)
-        ADD_CHECKPOINT2(0,     "100eecf718ec6f83b7ad2866485a8e126ea129db9adabf979b336b4c4c643544", "0x1");
+       ADD_CHECKPOINT2(0,     "35a52da251dc128e3c30ebe32f53b6652531ecd6ddfadab25d96cf56d0528ad5", "0x1");
+       ADD_CHECKPOINT2(50, "64d541814de97209b2510e4dbf27f8849cc9410eeb8dfba1a8b1b9e2a6d7b0fc", "0x4108");
+       ADD_CHECKPOINT2(100, "b6e600b837d3ca9a17dd03fda5ee7e37a31ff46d03e58a2d2f3303c9b5975fec", "0x3170b");
+       ADD_CHECKPOINT2(150, "b0567da0ea48019f6af407a4f54850f8ddb3c9379ec2391ff3397692e4cc9000", "0x3bc5e");
+       ADD_CHECKPOINT2(200, "74edb78145354c46e99b86369bc18eb5d2393859558e50b4bf75d1a1e2daeeb0", "0x4590e");
+       ADD_CHECKPOINT2(250, "f259fa4e68c855fbf1478fbcc9194d4b58ebb599d5b927f221bd216c543363e0", "0x54420");
 #endif
         break;
     }
