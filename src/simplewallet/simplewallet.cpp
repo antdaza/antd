@@ -5784,7 +5784,7 @@ std::vector<uint8_t> extra;
     }
 
     // Store article metadata in the blockchain database
-    {
+  /*  {
         cryptonote::ADD_ARTICLE::request add_article_req = {};
         cryptonote::ADD_ARTICLE::response add_article_res = {};
         
@@ -5804,12 +5804,12 @@ std::vector<uint8_t> extra;
 
     message_writer() << tr("Article content stored in blockchain database with hash: ") 
                      << epee::string_tools::pod_to_hex(article_meta.content_hash);
-
-std::string extra_nonce = "ARTC" + article_meta.serialized_blob;
-if (!add_extra_nonce_to_tx_extra(extra, extra_nonce)) {
-    fail_msg_writer() << tr("Failed to add article metadata to tx_extra");
-    return false;
-}
+*/
+    std::string extra_nonce = "ARTC" + article_meta.serialized_blob;
+    if (!add_extra_nonce_to_tx_extra(extra, extra_nonce)) {
+       fail_msg_writer() << tr("Failed to add article metadata to tx_extra");
+       return false;
+    }
 
     std::set<uint32_t> subaddr_indices;
     if (local_args.size() > 0 && local_args[0].substr(0, 6) == "index=") {
@@ -6159,7 +6159,36 @@ if (!add_extra_nonce_to_tx_extra(extra, extra_nonce)) {
     }
     else
     {
-      commit_or_save(ptx_vector, m_do_not_relay);
+    try {
+        commit_or_save(ptx_vector, m_do_not_relay);
+    } catch (const tools::error::wallet_internal_error& e) {
+        fail_msg_writer() << tr("Failed to commit or save transaction: ") << e.what();
+        return false;
+    } catch (const tools::error::daemon_busy& e) {
+        fail_msg_writer() << tr("Failed to commit transaction: Daemon busy: ") << e.what();
+        return false;
+    } catch (const std::exception& e) {
+        fail_msg_writer() << tr("Failed to commit or save transaction: ") << e.what();
+        return false;
+    }
+
+   // Store article metadata in the blockchain database
+    {
+        cryptonote::ADD_ARTICLE::request add_article_req = {};
+        cryptonote::ADD_ARTICLE::response add_article_res = {};
+
+        add_article_req.article_hash = article_meta.content_hash;
+        add_article_req.content = content;
+
+        if (!m_wallet->invoke_http_json_rpc("/json_rpc", "add_article", add_article_req, add_article_res)) {
+            fail_msg_writer() << tr("Warning: Failed to invoke article storage RPC. Transaction committed, but article metadata not stored in database.");
+        } else if (!add_article_res.status) {
+            fail_msg_writer() << tr("Warning: Failed to store article in database: ") << add_article_res.error;
+        } else {
+            message_writer() << tr("Article content stored in blockchain database with hash: ") 
+                             << epee::string_tools::pod_to_hex(article_meta.content_hash);
+        }
+    }
     }
   }
   catch (const std::exception &e)

@@ -591,36 +591,112 @@ namespace cryptonote
     return get_tx_pub_key_from_extra(tx.extra, pk_index);
   }
   //-----------------------------------------------------------------
-  article_metadata set_article_to_tx_extra(const std::string& title, 
-                                       const std::string& content,
-                                       const std::string& publisher)
-{
-    article_metadata result;
-    result.success = false;
+    static bool is_valid_hex_string(const std::string& str) {
+        return str.size() == 64 && // 32-byte hash = 64 hex chars
+               std::all_of(str.begin(), str.end(), [](char c) {
+                   return std::isxdigit(static_cast<unsigned char>(c)); // Only 0-9, a-f, A-F
+               });
+    }
 
-    // Calculate content hash
-    cn_fast_hash(content.data(), content.size(), result.content_hash);
-    std::string content_hash_hex = epee::string_tools::pod_to_hex(result.content_hash);
-
-    // Prepare metadata - store both hash and content
-    std::ostringstream oss;
-    oss << "TITLE:" << title 
-        << ";CONTENT_HASH:" << content_hash_hex
-  //      << ";CONTENT:" << content
-        << ";PUBLISHER:" << publisher;
-
-    result.serialized_blob = oss.str();
-
-    // Increased size limit
-    const size_t MAX_ARTICLE_SIZE = 3072; // 3KB
-    if (result.serialized_blob.size() > MAX_ARTICLE_SIZE) {
-        result.error = "Article data too large (max " + std::to_string(MAX_ARTICLE_SIZE) + " bytes)";
+    static std::string remove_delimiters(const std::string& input) {
+        std::string result = input;
+        result.erase(std::remove(result.begin(), result.end(), ':'), result.end()); // Remove colons
+        result.erase(std::remove(result.begin(), result.end(), ';'), result.end()); // Remove semicolons
         return result;
     }
 
-    result.success = true;
-    return result;
-}
+    article_metadata set_article_to_tx_extra(const std::string& title, 
+                                            const std::string& content,
+                                            const std::string& publisher)
+    {
+        article_metadata result;
+        result.success = false;
+
+        // Sanitize inputs
+        std::string sanitized_title = remove_delimiters(title);
+        std::string sanitized_content = remove_delimiters(content);
+        std::string sanitized_publisher = remove_delimiters(publisher);
+
+        // Log sanitization
+        if (sanitized_title != title) {
+            MLOG_RED(el::Level::Info, "Sanitized title: original=" << title << ", sanitized=" << sanitized_title);
+        }
+        if (sanitized_content != content) {
+            MLOG_RED(el::Level::Info, "Sanitized content: original=" << content << ", sanitized=" << sanitized_content);
+        }
+        if (sanitized_publisher != publisher) {
+            MLOG_RED(el::Level::Info, "Sanitized publisher: original=" << publisher << ", sanitized=" << sanitized_publisher);
+        }
+
+        // Validate inputs
+        if (sanitized_title.empty() || sanitized_content.empty() || sanitized_publisher.empty()) {
+            result.error = "Title, content, or publisher is empty after sanitization";
+            return result;
+        }
+        if (sanitized_title.size() > 128 || sanitized_content.size() > 3000 || sanitized_publisher.size() > 64) {
+            result.error = "Article metadata too long after sanitization (title ≤ 128, content ≤ 3000, publisher ≤ 64)";
+            return result;
+        }
+
+        // Calculate content hash
+        cn_fast_hash(sanitized_content.data(), sanitized_content.size(), result.content_hash);
+        std::string content_hash_hex = epee::string_tools::pod_to_hex(result.content_hash);
+
+        // Validate and sanitize hash
+        if (!is_valid_hex_string(content_hash_hex)) {
+            std::string sanitized_hash = content_hash_hex;
+            sanitized_hash.erase(std::remove(sanitized_hash.begin(), sanitized_hash.end(), ':'), sanitized_hash.end());
+            if (!is_valid_hex_string(sanitized_hash)) {
+                result.error = "Invalid content hash format: " + content_hash_hex;
+                MLOG_RED(el::Level::Error, "Invalid hash: " << content_hash_hex);
+                return result;
+            }
+            content_hash_hex = sanitized_hash;
+            MLOG_RED(el::Level::Info, "Sanitized content_hash_hex: original=" << content_hash_hex << ", sanitized=" << sanitized_hash);
+        }
+
+        // Prepare metadata
+        std::ostringstream oss;
+        oss << "TITLE:" << sanitized_title 
+            << ";CONTENT_HASH:" << content_hash_hex
+            << ";PUBLISHER:" << sanitized_publisher;
+
+        result.serialized_blob = oss.str();
+        MLOG_RED(el::Level::Info, "Serialized blob: size=" << result.serialized_blob.size() << ", content=" << result.serialized_blob);
+
+        const size_t MAX_ARTICLE_SIZE = 3072; // 3KB
+        if (result.serialized_blob.size() > MAX_ARTICLE_SIZE) {
+            result.error = "Article data too large (max " + std::to_string(MAX_ARTICLE_SIZE) + " bytes)";
+            return result;
+        }
+
+        result.success = true;
+        return result;
+    }
+
+    bool add_article_to_tx_extra(std::vector<uint8_t>& tx_extra, 
+                                const std::string& title,
+                                const std::string& content,
+                                const std::string& publisher)
+    {
+        // Prepare article metadata
+        article_metadata meta = set_article_to_tx_extra(title, content, publisher);
+        if (!meta.success) {
+            LOG_ERROR("Failed to prepare article: " << meta.error);
+            return false;
+        }
+
+        // Create the extra nonce string
+        std::string extra_nonce = TX_EXTRA_NONCE_ARTICLE_PREFIX + meta.serialized_blob;
+
+        // Add to tx_extra
+        if (!add_extra_nonce_to_tx_extra(tx_extra, extra_nonce)) {
+            LOG_ERROR("Failed to add article nonce to tx_extra");
+            return false;
+        }
+
+        return true;
+    }
   //---------------------------------------------------------------
    bool get_tx_extra_nonce(const std::vector<uint8_t>& extra, std::string& nonce)
   {
@@ -713,30 +789,6 @@ namespace cryptonote
     //write data
     ++start_pos;
     memcpy(&tx_extra[start_pos], extra_nonce.data(), extra_nonce.size());
-    return true;
-  }
-  //---------------------------------------------------------------
-  bool add_article_to_tx_extra(std::vector<uint8_t>& tx_extra, 
-                           const std::string& title,
-                           const std::string& content,
-                           const std::string& publisher)
-  {
-    // Prepare article metadata
-    article_metadata meta = set_article_to_tx_extra(title, content, publisher);
-    if (!meta.success) {
-        LOG_ERROR("Failed to prepare article: " << meta.error);
-        return false;
-    }
-
-    // Create the extra nonce string
-    std::string extra_nonce = TX_EXTRA_NONCE_ARTICLE_PREFIX + meta.serialized_blob;
-
-    // Add to tx_extra
-    if (!add_extra_nonce_to_tx_extra(tx_extra, extra_nonce)) {
-        LOG_ERROR("Failed to add article nonce to tx_extra");
-        return false;
-    }
-
     return true;
   }
   //-----------------------------------------------
