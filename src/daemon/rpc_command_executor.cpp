@@ -992,7 +992,30 @@ bool t_rpc_command_executor::print_transaction(crypto::hash transaction_hash,
           }
           else
           {
-            tools::success_msg_writer() << cryptonote::obj_to_json_str(tx);
+           try {
+                tools::success_msg_writer() << cryptonote::obj_to_json_str(tx);
+           } catch (...) {
+                tools::fail_msg_writer() << "JSON print failed, falling back to manual output:";
+                tools::success_msg_writer() << "version: " << (int)tx.version;
+                tools::success_msg_writer() << "unlock_time: " << tx.unlock_time;
+                tools::success_msg_writer() << "vin: " << tx.vin.size();
+                tools::success_msg_writer() << "vout: " << tx.vout.size();
+                tools::success_msg_writer() << "extra (size): " << tx.extra.size();
+                for (const auto& vin : tx.vin)
+                {
+                 if (vin.type() == typeid(cryptonote::txin_to_key))
+                {
+                  const auto& in = boost::get<cryptonote::txin_to_key>(vin);
+                  tools::success_msg_writer() << "Input: key image = " << epee::string_tools::pod_to_hex(in.k_image);
+                  tools::success_msg_writer() << "Input amount = " << in.amount;
+                 }
+                }
+
+                std::string extra_str(reinterpret_cast<const char*>(tx.extra.data()), tx.extra.size());
+                std::string hex = epee::string_tools::buff_to_hex_nodelimer(extra_str);
+                tools::success_msg_writer() << "tx.extra (hex): " << hex;
+}
+
           }
         }
       }
