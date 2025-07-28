@@ -50,7 +50,7 @@ set(crypto_sources
   CryptonightR_JIT.c
   tree-hash.c)
 
-if(ARCH_ID STREQUAL "i386" OR ARCH_ID STREQUAL "x86_64" OR ARCH_ID STREQUAL "x86-64" OR ARCH_ID STREQUAL "amd64")
+if(ARCH_ID STREQUAL "i386" OR ARCH_ID STREQUAL "x86_64" OR ARCH_ID STREQUAL "x86-64" OR ARCH_ID STREQUAL "amd64" OR ARCH_ID STREQUAL "aarch64")
 list(APPEND crypto_sources CryptonightR_template.S)
 endif()
 
