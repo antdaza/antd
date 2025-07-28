@@ -102,6 +102,8 @@ public:
 
   bool is_key_image_spent(const crypto::key_image &ki);
 
+  bool show_article(const crypto::hash& txid);
+
   bool print_transaction_pool_long();
 
   bool print_transaction_pool_short();

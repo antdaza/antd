@@ -320,6 +320,23 @@ bool t_command_parser_executor::print_transaction(const std::vector<std::string>
   return true;
 }
 
+bool t_command_parser_executor::show_article(const std::vector<std::string>& args)
+{
+  if (args.size() != 1)
+  {
+    std::cerr << "Expected one argument: txid" << std::endl;
+    return false;
+  }
+
+  crypto::hash txid;
+  if (!epee::string_tools::hex_to_pod(args[0], txid))
+  {
+    std::cerr << "Invalid transaction hash" << std::endl;
+    return false;
+  }
+
+  return m_executor.show_article(txid);
+}
 bool t_command_parser_executor::is_key_image_spent(const std::vector<std::string>& args)
 {
   if (args.empty())

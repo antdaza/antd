@@ -42,6 +42,8 @@
 #include <boost/format.hpp>
 #include "cryptonote_core/constants.h"
 #include "common/antd_integration_test_hooks.h"
+#include "cryptonote_basic/serialization_overrides.h"
+#include "cryptonote_protocol/cryptonote_protocol_defs.h"
 
 #include <fstream>
 #include <ctime>
@@ -865,9 +867,13 @@ bool t_rpc_command_executor::print_block_by_height(uint64_t height, bool include
   return true;
 }
 
+#include <common/util.h> // For epee::to_hex
+#include <string_tools.h> // For epee::string_tools
+
 bool t_rpc_command_executor::print_transaction(crypto::hash transaction_hash,
-  bool include_hex,
-  bool include_json) {
+                                              bool include_hex,
+                                              bool include_json)
+{
   cryptonote::COMMAND_RPC_GET_TRANSACTIONS::request req;
   cryptonote::COMMAND_RPC_GET_TRANSACTIONS::response res;
 
@@ -893,67 +899,464 @@ bool t_rpc_command_executor::print_transaction(crypto::hash transaction_hash,
     }
   }
 
-  if (1 == res.txs.size() || 1 == res.txs_as_hex.size())
+  if (res.txs.size() != 1 && res.txs_as_hex.size() != 1)
   {
-    if (1 == res.txs.size())
+    tools::fail_msg_writer() << "Transaction wasn't found: " << transaction_hash << std::endl;
+    return true;
+  }
+
+  const std::string &as_hex = (res.txs.size() == 1) ? res.txs.front().as_hex : res.txs_as_hex.front();
+  const std::string &pruned_as_hex = (res.txs.size() == 1) ? res.txs.front().pruned_as_hex : "";
+  const std::string &prunable_as_hex = (res.txs.size() == 1) ? res.txs.front().prunable_as_hex : "";
+  bool in_pool = (res.txs.size() == 1) ? res.txs.front().in_pool : false;
+  uint64_t block_height = (res.txs.size() == 1) ? res.txs.front().block_height : 0;
+
+  if (res.txs.size() == 1)
+  {
+    if (in_pool)
+      tools::success_msg_writer() << "Found in pool";
+    else
+      tools::success_msg_writer() << "Found in blockchain at height " << block_height
+                                 << (prunable_as_hex.empty() ? " (pruned)" : "");
+  }
+
+  // Print raw hex if requested
+  if (include_hex)
+  {
+    if (!as_hex.empty())
     {
-      // only available for new style answers
-      if (res.txs.front().in_pool)
-        tools::success_msg_writer() << "Found in pool";
-      else
-        tools::success_msg_writer() << "Found in blockchain at height " << res.txs.front().block_height << (res.txs.front().prunable_as_hex.empty() ? " (pruned)" : "");
+      tools::success_msg_writer() << as_hex << std::endl;
+    }
+    else
+    {
+      std::string output = pruned_as_hex + prunable_as_hex;
+      tools::success_msg_writer() << output << std::endl;
+    }
+  }
+
+  // Parse transaction for article data and JSON
+  if (include_json)
+  {
+    crypto::hash tx_hash, tx_prefix_hash;
+    cryptonote::transaction tx;
+    cryptonote::blobdata blob;
+    std::string source = as_hex.empty() ? pruned_as_hex + prunable_as_hex : as_hex;
+
+    if (!string_tools::parse_hexstr_to_binbuff(source, blob))
+    {
+      tools::fail_msg_writer() << "Failed to parse tx to get json format";
+      return true;
     }
 
-    const std::string &as_hex = (1 == res.txs.size()) ? res.txs.front().as_hex : res.txs_as_hex.front();
-    const std::string &pruned_as_hex = (1 == res.txs.size()) ? res.txs.front().pruned_as_hex : "";
-    const std::string &prunable_as_hex = (1 == res.txs.size()) ? res.txs.front().prunable_as_hex : "";
-    // Print raw hex if requested
-    if (include_hex)
+    if (!cryptonote::parse_and_validate_tx_from_blob(blob, tx))
     {
-      if (!as_hex.empty())
-      {
-        tools::success_msg_writer() << as_hex << std::endl;
-      }
-      else
-      {
-        std::string output = pruned_as_hex + prunable_as_hex;
-        tools::success_msg_writer() << output << std::endl;
-      }
+      tools::fail_msg_writer() << "Failed to parse tx blob to get json format";
+      return true;
     }
 
-    // Print json if requested
-    if (include_json)
+    // Parse tx_extra for article data
+    bool has_article = false;
+    std::vector<cryptonote::tx_extra_field> tx_extra_fields;
+    if (cryptonote::parse_tx_extra(tx.extra, tx_extra_fields))
     {
-      crypto::hash tx_hash, tx_prefix_hash;
-      cryptonote::transaction tx;
-      cryptonote::blobdata blob;
-      std::string source = as_hex.empty() ? pruned_as_hex + prunable_as_hex : as_hex;
-      bool pruned = !pruned_as_hex.empty() && prunable_as_hex.empty();
-      if (!string_tools::parse_hexstr_to_binbuff(source, blob))
+      cryptonote::tx_extra_nonce nonce;
+      if (cryptonote::find_tx_extra_field_by_type(tx_extra_fields, nonce))
       {
-        tools::fail_msg_writer() << "Failed to parse tx to get json format";
-      }
-      else
-      {
-        bool ret;
-        if (pruned)
-          ret = cryptonote::parse_and_validate_tx_base_from_blob(blob, tx);
-        else
-          ret = cryptonote::parse_and_validate_tx_from_blob(blob, tx);
-        if (!ret)
+        std::string extra_str(nonce.nonce.begin(), nonce.nonce.end());
+        tools::success_msg_writer() << "Debug: Raw nonce (hex): " << epee::to_hex::string(epee::span<const uint8_t>(reinterpret_cast<const uint8_t*>(extra_str.data()), extra_str.size()));
+
+        cryptonote::tx_extra_article_info article_info;
+        size_t pos = 0;
+        if (extra_str.size() >= 8 && extra_str.substr(0, 4) == "ARTC" && extra_str.substr(4, 4) == "ARTC")
         {
-          tools::fail_msg_writer() << "Failed to parse tx blob to get json format";
+          tools::success_msg_writer() << "Debug: Found double ARTC prefix, skipping 8 bytes";
+          pos = 8;
+        }
+        else if (extra_str.size() >= 4 && extra_str.substr(0, 4) == "ARTC")
+        {
+          tools::success_msg_writer() << "Debug: Found single ARTC prefix, skipping 4 bytes";
+          pos = 4;
+        }
+
+        if (pos > 0)
+        {
+          try
+          {
+            uint8_t title_len = static_cast<uint8_t>(extra_str[pos++]);
+            if (pos + title_len > extra_str.size())
+            {
+              tools::success_msg_writer() << "Debug: Invalid title length";
+            }
+            else
+            {
+              article_info.title = extra_str.substr(pos, title_len);
+              pos += title_len;
+
+              if (pos + 2 <= extra_str.size())
+              {
+                uint16_t content_len = (static_cast<uint8_t>(extra_str[pos]) << 8) | static_cast<uint8_t>(extra_str[pos + 1]);
+                pos += 2;
+                if (pos + content_len <= extra_str.size())
+                {
+                  article_info.content = extra_str.substr(pos, content_len);
+                  pos += content_len;
+
+                  if (pos < extra_str.size())
+                  {
+                    uint8_t publisher_len = static_cast<uint8_t>(extra_str[pos++]);
+                    if (pos + publisher_len <= extra_str.size())
+                    {
+                      article_info.publisher = extra_str.substr(pos, publisher_len);
+                      has_article = true;
+                      tools::success_msg_writer() << "Article Information:";
+                      tools::success_msg_writer() << "Title: " << article_info.title;
+                      tools::success_msg_writer() << "Publisher: " << article_info.publisher;
+                      tools::success_msg_writer() << "Content: " << article_info.content;
+                      crypto::hash content_hash;
+                      crypto::cn_fast_hash(article_info.content.data(), article_info.content.size(), content_hash);
+                      tools::success_msg_writer() << "Content Hash: " << epee::string_tools::pod_to_hex(content_hash);
+                    }
+                  }
+                }
+              }
+            }
+          }
+          catch (const std::exception& e)
+          {
+            tools::success_msg_writer() << "Debug: Failed to parse article data: " << e.what();
+          }
+        }
+      }
+    }
+
+    // Output JSON, skipping full transaction if article data was found
+    if (!has_article)
+    {
+      try
+      {
+        tools::success_msg_writer() << cryptonote::obj_to_json_str(tx) << std::endl;
+      }
+      catch (const std::exception& e)
+      {
+        tools::fail_msg_writer() << "Failed to serialize tx to JSON: " << e.what();
+        return true;
+      }
+    }
+    else
+    {
+      // Output custom JSON for nonce to avoid serialization issues
+      tools::success_msg_writer() << "{\"tx_extra_nonce_hex\": \"" << epee::to_hex::string(epee::span<const uint8_t>(tx.extra.data(), tx.extra.size())) << "\"}" << std::endl;
+    }
+  }
+
+  return true;
+}
+
+#include <common/util.h> // For epee::to_hex
+#include <string_tools.h> // For epee::string_tools
+
+// Custom JSON escape function
+static std::string json_escape(const std::string& s)
+{
+  std::string result;
+  result.reserve(s.size() * 2); // Reserve space for potential escapes
+  for (char c : s)
+  {
+    switch (c)
+    {
+      case '"':  result += "\\\""; break;
+      case '\\': result += "\\\\"; break;
+      case '\n': result += "\\n"; break;
+      case '\t': result += "\\t"; break;
+      case '\r': result += "\\r"; break;
+      case '\b': result += "\\b"; break;
+      case '\f': result += "\\f"; break;
+      default:
+        if (static_cast<unsigned char>(c) < 32 || c == 127)
+        {
+          // Escape non-printable characters as \uXXXX
+          char buf[7];
+          snprintf(buf, sizeof(buf), "\\u%04x", static_cast<unsigned char>(c));
+          result += buf;
         }
         else
         {
-          tools::success_msg_writer() << cryptonote::obj_to_json_str(tx) << std::endl;
+          result += c;
         }
-      }
+    }
+  }
+  return result;
+}
+
+bool t_rpc_command_executor::print_transaction_pool_long()
+{
+  cryptonote::COMMAND_RPC_GET_TRANSACTION_POOL::request req;
+  cryptonote::COMMAND_RPC_GET_TRANSACTION_POOL::response res;
+
+  std::string fail_message = "Problem fetching transaction pool";
+
+  if (m_is_rpc)
+  {
+    if (!m_rpc_client->rpc_request(req, res, "/get_transaction_pool", fail_message.c_str()))
+    {
+      return true;
     }
   }
   else
   {
-    tools::fail_msg_writer() << "Transaction wasn't found: " << transaction_hash << std::endl;
+    if (!m_rpc_server->on_get_transaction_pool(req, res) || res.status != CORE_RPC_STATUS_OK)
+    {
+      tools::fail_msg_writer() << make_error(fail_message, res.status);
+      return true;
+    }
+  }
+
+  if (res.transactions.empty() && res.spent_key_images.empty())
+  {
+    tools::msg_writer() << "Pool is empty" << std::endl;
+    return true;
+  }
+
+  if (!res.transactions.empty())
+  {
+    const time_t now = time(nullptr);
+    tools::msg_writer() << "Transactions: ";
+    for (auto& tx_info : res.transactions)
+    {
+      // Parse transaction to check for article data and generate JSON
+      bool has_article = false;
+      cryptonote::transaction tx;
+      cryptonote::blobdata blob;
+      cryptonote::tx_extra_article_info article_info;
+      std::string nonce_hex;
+
+      bool tx_valid = false;
+      try
+      {
+        if (string_tools::parse_hexstr_to_binbuff(tx_info.tx_blob, blob) &&
+            cryptonote::parse_and_validate_tx_from_blob(blob, tx))
+        {
+          tx_valid = true;
+          std::vector<cryptonote::tx_extra_field> tx_extra_fields;
+          if (cryptonote::parse_tx_extra(tx.extra, tx_extra_fields))
+          {
+            cryptonote::tx_extra_nonce nonce;
+            if (cryptonote::find_tx_extra_field_by_type(tx_extra_fields, nonce))
+            {
+              std::string extra_str(nonce.nonce.begin(), nonce.nonce.end());
+              nonce_hex = epee::to_hex::string(epee::span<const uint8_t>(reinterpret_cast<const uint8_t*>(extra_str.data()), extra_str.size()));
+              tools::msg_writer() << "Debug: Raw nonce (hex): " << nonce_hex;
+
+              size_t pos = 0;
+              if (extra_str.size() >= 8 && extra_str.substr(0, 4) == "ARTC" && extra_str.substr(4, 4) == "ARTC")
+              {
+                tools::msg_writer() << "Debug: Found double ARTC prefix, skipping 8 bytes";
+                pos = 8;
+              }
+              else if (extra_str.size() >= 4 && extra_str.substr(0, 4) == "ARTC")
+              {
+                tools::msg_writer() << "Debug: Found single ARTC prefix, skipping 4 bytes";
+                pos = 4;
+              }
+
+              if (pos > 0)
+              {
+                uint8_t title_len = static_cast<uint8_t>(extra_str[pos++]);
+                if (pos + title_len <= extra_str.size())
+                {
+                  article_info.title = extra_str.substr(pos, title_len);
+                  pos += title_len;
+
+                  if (pos + 2 <= extra_str.size())
+                  {
+                    uint16_t content_len = (static_cast<uint8_t>(extra_str[pos]) << 8) | static_cast<uint8_t>(extra_str[pos + 1]);
+                    pos += 2;
+                    if (pos + content_len <= extra_str.size())
+                    {
+                      article_info.content = extra_str.substr(pos, content_len);
+                      pos += content_len;
+
+                      if (pos < extra_str.size())
+                      {
+                        uint8_t publisher_len = static_cast<uint8_t>(extra_str[pos++]);
+                        if (pos + publisher_len <= extra_str.size())
+                        {
+                          article_info.publisher = extra_str.substr(pos, publisher_len);
+                          has_article = true;
+                          tools::msg_writer() << "Article Information:";
+                          tools::msg_writer() << "Title: " << article_info.title;
+                          tools::msg_writer() << "Publisher: " << article_info.publisher;
+                          tools::msg_writer() << "Content: " << article_info.content;
+                          crypto::hash content_hash;
+                          crypto::cn_fast_hash(article_info.content.data(), article_info.content.size(), content_hash);
+                          tools::msg_writer() << "Content Hash: " << epee::string_tools::pod_to_hex(content_hash);
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      catch (const std::exception& e)
+      {
+        tools::msg_writer() << "Debug: Failed to parse transaction: " << e.what();
+      }
+
+      // Output transaction details
+      tools::msg_writer() << "id: " << tx_info.id_hash;
+
+      // Generate custom JSON for all transactions
+      std::stringstream ss;
+      ss << "{";
+      ss << "\"tx_hash\": \"" << tx_info.id_hash << "\",";
+      ss << "\"blob_size\": " << tx_info.blob_size << ",";
+      ss << "\"weight\": " << tx_info.weight << ",";
+      ss << "\"fee\": \"" << cryptonote::print_money(tx_info.fee) << "\",";
+      ss << "\"receive_time\": " << tx_info.receive_time << ",";
+      ss << "\"relayed\": " << (tx_info.relayed ? "\"" + boost::lexical_cast<std::string>(tx_info.last_relayed_time) + "\"" : "\"no\"") << ",";
+      ss << "\"do_not_relay\": " << (tx_info.do_not_relay ? "true" : "false") << ",";
+      ss << "\"kept_by_block\": " << (tx_info.kept_by_block ? "true" : "false") << ",";
+      ss << "\"double_spend_seen\": " << (tx_info.double_spend_seen ? "true" : "false") << ",";
+      ss << "\"max_used_block_height\": " << tx_info.max_used_block_height << ",";
+      ss << "\"max_used_block_id\": \"" << tx_info.max_used_block_id_hash << "\",";
+      ss << "\"last_failed_height\": " << tx_info.last_failed_height << ",";
+      ss << "\"last_failed_id\": \"" << tx_info.last_failed_id_hash << "\"";
+      if (tx_valid)
+      {
+        if (has_article)
+        {
+          ss << ",\"tx_extra_nonce_hex\": \"" << nonce_hex << "\",";
+          ss << "\"article\": {";
+          ss << "\"title\": \"" << json_escape(article_info.title) << "\",";
+          ss << "\"content\": \"" << json_escape(article_info.content) << "\",";
+          ss << "\"publisher\": \"" << json_escape(article_info.publisher) << "\",";
+          crypto::hash content_hash;
+          crypto::cn_fast_hash(article_info.content.data(), article_info.content.size(), content_hash);
+          ss << "\"content_hash\": \"" << epee::string_tools::pod_to_hex(content_hash) << "\"";
+          ss << "}";
+        }
+        else if (!nonce_hex.empty())
+        {
+          ss << ",\"tx_extra_nonce_hex\": \"" << nonce_hex << "\"";
+        }
+      }
+      ss << "}";
+      tools::msg_writer() << ss.str();
+
+      tools::msg_writer() << "blob_size: " << tx_info.blob_size;
+      tools::msg_writer() << "weight: " << tx_info.weight;
+      tools::msg_writer() << "fee: " << cryptonote::print_money(tx_info.fee);
+      tools::msg_writer() << "fee/byte: " << cryptonote::print_money(tx_info.fee / (double)tx_info.weight);
+      tools::msg_writer() << "receive_time: " << tx_info.receive_time << " (" << get_human_time_ago(tx_info.receive_time, now) << ")";
+      tools::msg_writer() << "relayed: " << (tx_info.relayed ? boost::lexical_cast<std::string>(tx_info.last_relayed_time) + " (" + get_human_time_ago(tx_info.last_relayed_time, now) + ")" : "no");
+      tools::msg_writer() << "do_not_relay: " << (tx_info.do_not_relay ? 'T' : 'F');
+      tools::msg_writer() << "kept_by_block: " << (tx_info.kept_by_block ? 'T' : 'F');
+      tools::msg_writer() << "double_spend_seen: " << (tx_info.double_spend_seen ? 'T' : 'F');
+      tools::msg_writer() << "max_used_block_height: " << tx_info.max_used_block_height;
+      tools::msg_writer() << "max_used_block_id: " << tx_info.max_used_block_id_hash;
+      tools::msg_writer() << "last_failed_height: " << tx_info.last_failed_height;
+      tools::msg_writer() << "last_failed_id: " << tx_info.last_failed_id_hash;
+    }
+    if (res.spent_key_images.empty())
+    {
+      tools::msg_writer() << "WARNING: Inconsistent pool state - no spent key images";
+    }
+  }
+
+  if (!res.spent_key_images.empty())
+  {
+    tools::msg_writer() << ""; // one newline
+    tools::msg_writer() << "Spent key images: ";
+    for (const cryptonote::spent_key_image_info& kinfo : res.spent_key_images)
+    {
+      tools::msg_writer() << "key image: " << kinfo.id_hash;
+      if (kinfo.txs_hashes.size() == 1)
+      {
+        tools::msg_writer() << "  tx: " << kinfo.txs_hashes[0];
+      }
+      else if (kinfo.txs_hashes.size() == 0)
+      {
+        tools::msg_writer() << "  WARNING: spent key image has no txs associated";
+      }
+      else
+      {
+        tools::msg_writer() << "  NOTE: key image for multiple txs: " << kinfo.txs_hashes.size();
+        for (const std::string& tx_id : kinfo.txs_hashes)
+        {
+          tools::msg_writer() << "  tx: " << tx_id;
+        }
+      }
+    }
+    if (res.transactions.empty())
+    {
+      tools::msg_writer() << "WARNING: Inconsistent pool state - no transactions";
+    }
+  }
+
+  return true;
+}
+
+bool t_rpc_command_executor::show_article(const crypto::hash& txid)
+{
+  cryptonote::COMMAND_RPC_SHOW_ARTICLE::request req;
+  cryptonote::COMMAND_RPC_SHOW_ARTICLE::response res;
+  std::string fail_message = "Problem fetching article data";
+
+  req.txid = epee::string_tools::pod_to_hex(txid);
+
+  if (m_is_rpc)
+  {
+    if (!m_rpc_client->rpc_request(req, res, "/show_article", fail_message.c_str()))
+    {
+      return true;
+    }
+  }
+  else
+  {
+  epee::json_rpc::error error_resp;
+
+   if (!m_rpc_server->on_show_article(req, res, error_resp, nullptr) || res.status != CORE_RPC_STATUS_OK)
+    {
+      tools::fail_msg_writer() << make_error(fail_message, res.status);
+      return true;
+    }
+  }
+
+  if (res.in_pool)
+    tools::success_msg_writer() << "Transaction found in pool";
+  else
+    tools::success_msg_writer() << "Transaction found in blockchain at height " << res.block_height;
+
+  if (res.article_found)
+  {
+    tools::success_msg_writer() << "Article Information:";
+    tools::success_msg_writer() << "Title: " << res.title;
+    tools::success_msg_writer() << "Publisher: " << res.publisher;
+    tools::success_msg_writer() << "Content: " << res.content;
+    tools::success_msg_writer() << "Content Hash: " << res.content_hash;
+    tools::success_msg_writer() << "Raw nonce (hex): " << res.tx_extra_nonce_hex;
+
+    // Output JSON
+    std::stringstream ss;
+    ss << "{";
+    ss << "\"tx_hash\": \"" << epee::string_tools::pod_to_hex(txid) << "\",";
+    ss << "\"in_pool\": " << (res.in_pool ? "true" : "false") << ",";
+    ss << "\"block_height\": " << res.block_height << ",";
+    ss << "\"article_found\": true,";
+    ss << "\"title\": \"" << json_escape(res.title) << "\",";
+    ss << "\"content\": \"" << json_escape(res.content) << "\",";
+    ss << "\"publisher\": \"" << json_escape(res.publisher) << "\",";
+    ss << "\"content_hash\": \"" << res.content_hash << "\",";
+    ss << "\"tx_extra_nonce_hex\": \"" << res.tx_extra_nonce_hex << "\"";
+    ss << "}";
+    tools::success_msg_writer() << ss.str();
+  }
+  else
+  {
+    tools::msg_writer() << "No article data found in transaction";
   }
 
   return true;
@@ -995,91 +1398,7 @@ bool t_rpc_command_executor::is_key_image_spent(const crypto::key_image &ki) {
   return true;
 }
 
-bool t_rpc_command_executor::print_transaction_pool_long() {
-  cryptonote::COMMAND_RPC_GET_TRANSACTION_POOL::request req;
-  cryptonote::COMMAND_RPC_GET_TRANSACTION_POOL::response res;
 
-  std::string fail_message = "Problem fetching transaction pool";
-
-  if (m_is_rpc)
-  {
-    if (!m_rpc_client->rpc_request(req, res, "/get_transaction_pool", fail_message.c_str()))
-    {
-      return true;
-    }
-  }
-  else
-  {
-    if (!m_rpc_server->on_get_transaction_pool(req, res) || res.status != CORE_RPC_STATUS_OK)
-    {
-      tools::fail_msg_writer() << make_error(fail_message, res.status);
-      return true;
-    }
-  }
-
-  if (res.transactions.empty() && res.spent_key_images.empty())
-  {
-    tools::msg_writer() << "Pool is empty" << std::endl;
-  }
-  if (! res.transactions.empty())
-  {
-    const time_t now = time(NULL);
-    tools::msg_writer() << "Transactions: ";
-    for (auto & tx_info : res.transactions)
-    {
-      tools::msg_writer() << "id: " << tx_info.id_hash << std::endl
-                          << tx_info.tx_json << std::endl
-                          << "blob_size: " << tx_info.blob_size << std::endl
-                          << "weight: " << tx_info.weight << std::endl
-                          << "fee: " << cryptonote::print_money(tx_info.fee) << std::endl
-                          << "fee/byte: " << cryptonote::print_money(tx_info.fee / (double)tx_info.weight) << std::endl
-                          << "receive_time: " << tx_info.receive_time << " (" << get_human_time_ago(tx_info.receive_time, now) << ")" << std::endl
-                          << "relayed: " << [&](const cryptonote::tx_info &tx_info)->std::string { if (!tx_info.relayed) return "no"; return boost::lexical_cast<std::string>(tx_info.last_relayed_time) + " (" + get_human_time_ago(tx_info.last_relayed_time, now) + ")"; } (tx_info) << std::endl
-                          << "do_not_relay: " << (tx_info.do_not_relay ? 'T' : 'F')  << std::endl
-                          << "kept_by_block: " << (tx_info.kept_by_block ? 'T' : 'F') << std::endl
-                          << "double_spend_seen: " << (tx_info.double_spend_seen ? 'T' : 'F')  << std::endl
-                          << "max_used_block_height: " << tx_info.max_used_block_height << std::endl
-                          << "max_used_block_id: " << tx_info.max_used_block_id_hash << std::endl
-                          << "last_failed_height: " << tx_info.last_failed_height << std::endl
-                          << "last_failed_id: " << tx_info.last_failed_id_hash << std::endl;
-    }
-    if (res.spent_key_images.empty())
-    {
-      tools::msg_writer() << "WARNING: Inconsistent pool state - no spent key images";
-    }
-  }
-  if (! res.spent_key_images.empty())
-  {
-    tools::msg_writer() << ""; // one newline
-    tools::msg_writer() << "Spent key images: ";
-    for (const cryptonote::spent_key_image_info& kinfo : res.spent_key_images)
-    {
-      tools::msg_writer() << "key image: " << kinfo.id_hash;
-      if (kinfo.txs_hashes.size() == 1)
-      {
-        tools::msg_writer() << "  tx: " << kinfo.txs_hashes[0];
-      }
-      else if (kinfo.txs_hashes.size() == 0)
-      {
-        tools::msg_writer() << "  WARNING: spent key image has no txs associated";
-      }
-      else
-      {
-        tools::msg_writer() << "  NOTE: key image for multiple txs: " << kinfo.txs_hashes.size();
-        for (const std::string& tx_id : kinfo.txs_hashes)
-        {
-          tools::msg_writer() << "  tx: " << tx_id;
-        }
-      }
-    }
-    if (res.transactions.empty())
-    {
-      tools::msg_writer() << "WARNING: Inconsistent pool state - no transactions";
-    }
-  }
-
-  return true;
-}
 
 bool t_rpc_command_executor::print_transaction_pool_short() {
   cryptonote::COMMAND_RPC_GET_TRANSACTION_POOL::request req;

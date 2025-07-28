@@ -14,7 +14,7 @@ uint64_t get_staking_requirement(cryptonote::network_type m_nettype, uint64_t he
   if (m_nettype == cryptonote::TESTNET || m_nettype == cryptonote::FAKECHAIN)
       return COIN * 100;
 
-  return COIN * 200000;
+  return COIN * 100000;
 }
 
 uint64_t portions_to_amount(uint64_t portions, uint64_t staking_requirement)

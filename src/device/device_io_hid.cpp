@@ -152,6 +152,7 @@ namespace hw {
       this->usb_vid = vid;
       this->usb_pid = pid;
       this->usb_device = hwdev;
+      return hwdev;
     }
 
 

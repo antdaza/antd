@@ -156,7 +156,6 @@ namespace cryptonote
         MAP_JON_RPC_WE("get_txpool_backlog",     on_get_txpool_backlog,         COMMAND_RPC_GET_TRANSACTION_POOL_BACKLOG)
         MAP_JON_RPC_WE("get_output_distribution", on_get_output_distribution, COMMAND_RPC_GET_OUTPUT_DISTRIBUTION)
         MAP_JON_RPC_WE_IF("prune_blockchain",    on_prune_blockchain,           COMMAND_RPC_PRUNE_BLOCKCHAIN, !m_restricted)
-
         //
         // Antd
         //
@@ -170,9 +169,14 @@ namespace cryptonote
         MAP_JON_RPC_WE("get_all_full_nodes",                  on_get_all_full_nodes, COMMAND_RPC_GET_FULL_NODES)
         MAP_JON_RPC_WE("get_all_full_nodes_keys",             on_get_all_full_nodes_keys, COMMAND_RPC_GET_ALL_FULL_NODES_KEYS)
         MAP_JON_RPC_WE("get_staking_requirement",                on_get_staking_requirement, COMMAND_RPC_GET_STAKING_REQUIREMENT)
+        MAP_JON_RPC_WE("get_show_article",                         on_show_article, COMMAND_RPC_SHOW_ARTICLE)
       END_JSON_RPC_MAP()
     END_URI_MAP2()
 
+     bool on_show_article(const COMMAND_RPC_SHOW_ARTICLE::request& req,
+                                      COMMAND_RPC_SHOW_ARTICLE::response& res, epee::json_rpc::error& error_resp,
+                                      const connection_context* ctx = NULL);
+    //bool on_show_article(const COMMAND_RPC_SHOW_ARTICLE::request& req, COMMAND_RPC_SHOW_ARTICLE::response& res,  const connection_context *ctx = NULL);
     bool on_get_height(const COMMAND_RPC_GET_HEIGHT::request& req, COMMAND_RPC_GET_HEIGHT::response& res, const connection_context *ctx = NULL);
     bool on_get_blocks(const COMMAND_RPC_GET_BLOCKS_FAST::request& req, COMMAND_RPC_GET_BLOCKS_FAST::response& res, const connection_context *ctx = NULL);
     bool on_get_alt_blocks_hashes(const COMMAND_RPC_GET_ALT_BLOCKS_HASHES::request& req, COMMAND_RPC_GET_ALT_BLOCKS_HASHES::response& res, const connection_context *ctx = NULL);
@@ -234,7 +238,8 @@ namespace cryptonote
     bool on_get_version(const COMMAND_RPC_GET_VERSION::request& req, COMMAND_RPC_GET_VERSION::response& res, epee::json_rpc::error& error_resp, const connection_context *ctx = NULL);
     bool on_get_coinbase_tx_sum(const COMMAND_RPC_GET_COINBASE_TX_SUM::request& req, COMMAND_RPC_GET_COINBASE_TX_SUM::response& res, epee::json_rpc::error& error_resp, const connection_context *ctx = NULL);
     bool on_get_base_fee_estimate(const COMMAND_RPC_GET_BASE_FEE_ESTIMATE::request& req, COMMAND_RPC_GET_BASE_FEE_ESTIMATE::response& res, epee::json_rpc::error& error_resp, const connection_context *ctx = NULL);
-    bool on_get_alternate_chains(const COMMAND_RPC_GET_ALTERNATE_CHAINS::request& req, COMMAND_RPC_GET_ALTERNATE_CHAINS::response& res, epee::json_rpc::error& error_resp, const connection_context *ctx = NULL);
+    bool on_get_alternate_chains(const COMMAND_RPC_GET_ALTERNATE_CHAINS::request& req, COMMAND_RPC_GET_ALTERNATE_CHAINS::response& res, 
+epee::json_rpc::error& error_resp, const connection_context *ctx = NULL);
     bool on_relay_tx(const COMMAND_RPC_RELAY_TX::request& req, COMMAND_RPC_RELAY_TX::response& res, epee::json_rpc::error& error_resp, const connection_context *ctx = NULL);
     bool on_sync_info(const COMMAND_RPC_SYNC_INFO::request& req, COMMAND_RPC_SYNC_INFO::response& res, epee::json_rpc::error& error_resp, const connection_context *ctx = NULL);
     bool on_get_txpool_backlog(const COMMAND_RPC_GET_TRANSACTION_POOL_BACKLOG::request& req, COMMAND_RPC_GET_TRANSACTION_POOL_BACKLOG::response& res, epee::json_rpc::error& error_resp, const connection_context *ctx = NULL);

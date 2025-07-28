@@ -2984,6 +2984,9 @@ simple_wallet::simple_wallet()
   //
   // Antd
   //
+  m_cmd_binder.set_handler("show_article",
+                           boost::bind(&simple_wallet::show_article, this, _1),
+                           tr("Show article"));
   m_cmd_binder.set_handler("add_article",
                            boost::bind(&simple_wallet::add_article, this, _1),
                            tr(USAGE_ADD_ARTICLE),
@@ -5712,253 +5715,645 @@ bool simple_wallet::locked_transfer(const std::vector<std::string> &args_)
   return true;
 }
 
-static bool set_article_to_tx_extra(std::vector<uint8_t>& extra, const std::string& title, const std::string& content, const std::string& publisher)
-{
-  std::ostringstream oss;
-  oss << "TITLE:" << title << ";CONTENT:" << content << ";PUBLISHER:" << publisher;
-  std::string blob = oss.str();
+struct article_metadata {
+  bool success;
+  std::string error;
+  std::string serialized_blob;
+  std::string title;
+  std::string content;
+  std::string publisher;
+  crypto::hash content_hash;
 
-  if (blob.size() > 255)
+  article_metadata() : success(false), error(""), title(""), content(""), publisher(""), content_hash(crypto::null_hash) {}
+};
+//-------------------------------------------------------
+
+article_metadata set_article_to_tx_extra(const std::string& title, const std::string& content, const std::string& publisher) {
+  article_metadata result;
+  message_writer() << tr("Debug: set_article_to_tx_extra: Starting");
+
+  if (title.size() > 128 || content.size() > 2048 || publisher.size() > 64) {
+    result.error = "Metadata too large";
+    return result;
+  }
+  if (title.empty() || content.empty()) {
+    result.error = "Missing title or content";
+    return result;
+  }
+  tx_extra_article_info article_info = {title, content, publisher.empty() ? "Unknown" : publisher};
+
+  //message_writer() << tr("Debug: set_article_to_tx_extra: Manually serializing");
+  std::vector<uint8_t> serialized;
+  try {
+    size_t total_size = 1 + article_info.title.size() + 2 + article_info.content.size() + 1 + article_info.publisher.size();
+    if (total_size + 4 > TX_EXTRA_NONCE_MAX_COUNT - 2) { // Account for ARTC (4), tag (1), length (1)
+      result.error = "Serialized data too large: " + std::to_string(total_size + 4) + " bytes, max " + std::to_string(TX_EXTRA_NONCE_MAX_COUNT - 2);
+    //  message_writer() << tr("Debug: set_article_to_tx_extra: ") << result.error;
+      return result;
+    }
+
+    serialized.reserve(total_size);
+    serialized.push_back(static_cast<uint8_t>(article_info.title.size()));
+    serialized.insert(serialized.end(), article_info.title.begin(), article_info.title.end());
+    serialized.push_back(static_cast<uint8_t>(article_info.content.size() >> 8)); // High byte
+    serialized.push_back(static_cast<uint8_t>(article_info.content.size() & 0xFF)); // Low byte
+    serialized.insert(serialized.end(), article_info.content.begin(), article_info.content.end());
+    serialized.push_back(static_cast<uint8_t>(article_info.publisher.size()));
+    serialized.insert(serialized.end(), article_info.publisher.begin(), article_info.publisher.end());
+
+    result.serialized_blob = std::string("ARTC") + std::string(serialized.begin(), serialized.end());
+    //message_writer() << tr("Debug: set_article_to_tx_extra: Serialization completed, size: ") << result.serialized_blob.size();
+    //message_writer() << tr("Debug: set_article_to_tx_extra: Serialized data (hex): ") << epee::string_tools::buff_to_hex_nodelim(result.serialized_blob);
+  } catch (const std::exception& e) {
+    result.error = "Serialization exception: " + std::string(e.what());
+    //message_writer() << tr("Debug: set_article_to_tx_extra: ") << result.error;
+    return result;
+  }
+
+  if (result.serialized_blob.empty()) {
+    result.error = "Serialized data empty";
+    //message_writer() << tr("Debug: set_article_to_tx_extra: ") << result.error;
+    return result;
+  }
+
+ // message_writer() << tr("Debug: set_article_to_tx_extra: Computing content hash");
+  crypto::cn_fast_hash(content.data(), content.size(), result.content_hash);
+
+  result.success = true;
+  //message_writer() << tr("Debug: set_article_to_tx_extra: Completed");
+  return result;
+}
+static bool parse_article_metadata(const std::string& extra_nonce, article_metadata& result) {
+  result = article_metadata();
+  //message_writer() << tr("Debug: parse_article_metadata: Starting, extra_nonce size: ") << extra_nonce.size();
+ // message_writer() << tr("Debug: parse_article_metadata: extra_nonce (hex): ") << epee::string_tools::buff_to_hex_nodelim(extra_nonce);
+
+  if (extra_nonce.size() < 4 || extra_nonce.substr(0, 4) != "ARTC") {
+    result.error = "Invalid article metadata: missing ARTC prefix";
+    //message_writer() << tr("Debug: parse_article_metadata: ") << result.error;
     return false;
+  }
 
-  std::string extra_nonce;
-  extra_nonce = "ARTC" + blob; // 4-byte prefix
+  // Try binary format (length-prefixed)
+  {
+    size_t pos = 4;
+    const uint8_t* data = reinterpret_cast<const uint8_t*>(extra_nonce.data());
+    size_t size = extra_nonce.size();
 
-  return add_extra_nonce_to_tx_extra(extra, extra_nonce);
+    // Parse title
+    if (pos + 1 > size) {
+      result.error = "Invalid binary metadata: truncated title length";
+      //message_writer() << tr("Debug: parse_article_metadata: ") << result.error;
+      return false;
+    }
+    uint8_t title_len = data[pos++];
+    if (pos + title_len > size || title_len > 128) {
+      result.error = "Invalid binary metadata: invalid title length (" + std::to_string(title_len) + ")";
+     // message_writer() << tr("Debug: parse_article_metadata: ") << result.error;
+      return false;
+    }
+    result.title = std::string(data + pos, data + pos + title_len);
+    pos += title_len;
+
+    // Parse content
+    if (pos + 2 > size) {
+      result.error = "Invalid binary metadata: truncated content length";
+      //message_writer() << tr("Debug: parse_article_metadata: ") << result.error;
+      return false;
+    }
+    uint16_t content_len = (static_cast<uint16_t>(data[pos]) << 8) | data[pos + 1];
+    pos += 2;
+    if (pos + content_len > size || content_len > 2048) {
+      result.error = "Invalid binary metadata: invalid content length (" + std::to_string(content_len) + ")";
+      //message_writer() << tr("Debug: parse_article_metadata: ") << result.error;
+      // Don't return false yet; try string format
+    } else {
+      result.content = std::string(data + pos, data + pos + content_len);
+      pos += content_len;
+
+      // Parse publisher
+      if (pos + 1 > size) {
+        result.error = "Invalid binary metadata: truncated publisher length";
+       // message_writer() << tr("Debug: parse_article_metadata: ") << result.error;
+        return false;
+      }
+      uint8_t publisher_len = data[pos++];
+      if (pos + publisher_len > size || publisher_len > 64) {
+        result.error = "Invalid binary metadata: invalid publisher length (" + std::to_string(publisher_len) + ")";
+        //message_writer() << tr("Debug: parse_article_metadata: ") << result.error;
+        return false;
+      }
+      result.publisher = std::string(data + pos, data + pos + publisher_len);
+      pos += publisher_len;
+
+      if (pos != size) {
+        result.error = "Invalid binary metadata: extra data after parsing";
+        //message_writer() << tr("Debug: parse_article_metadata: ") << result.error;
+        return false;
+      }
+
+      message_writer() << tr("Debug: parse_article_metadata: Computing content hash");
+      crypto::cn_fast_hash(result.content.data(), result.content.size(), result.content_hash);
+      result.success = true;
+      //message_writer() << tr("Debug: parse_article_metadata: Completed (binary format)");
+      return true;
+    }
+  }
+
+  // Try string format (TITLE:<title>;CONTENT_HASH:<hash>;PUBLISHER:<publisher>)
+  {
+    const std::string title_tag = "TITLE:";
+    const std::string content_hash_tag = ";CONTENT_HASH:";
+    const std::string publisher_tag = ";PUBLISHER:";
+
+    size_t t_pos = extra_nonce.find(title_tag);
+    size_t c_pos = extra_nonce.find(content_hash_tag);
+    size_t p_pos = extra_nonce.find(publisher_tag);
+
+    if (t_pos != 4 || c_pos == std::string::npos || p_pos == std::string::npos || c_pos < t_pos + title_tag.length()) {
+      result.error = "Invalid metadata: malformed string format";
+      //message_writer() << tr("Debug: parse_article_metadata: ") << result.error;
+      return false;
+    }
+
+    result.title = extra_nonce.substr(t_pos + title_tag.length(), c_pos - (t_pos + title_tag.length()));
+    std::string content_hash_hex = extra_nonce.substr(c_pos + content_hash_tag.length(), p_pos - (c_pos + content_hash_tag.length()));
+    result.publisher = extra_nonce.substr(p_pos + publisher_tag.length());
+
+    // Load content from file
+    const std::string filename = content_hash_hex + ".txt";
+    std::ifstream file(filename);
+    if (!file) {
+      result.content = "[Error: Content file not found: " + filename + "]";
+      //message_writer() << tr("Debug: parse_article_metadata: Content file not found: ") << filename;
+    } else {
+      std::stringstream buffer;
+      buffer << file.rdbuf();
+      result.content = buffer.str();
+      //message_writer() << tr("Debug: parse_article_metadata: Loaded content from ") << filename;
+    }
+
+    // Compute content hash
+    crypto::cn_fast_hash(result.content.data(), result.content.size(), result.content_hash);
+    if (epee::string_tools::pod_to_hex(result.content_hash) != content_hash_hex) {
+      result.error = "Content hash mismatch";
+      //message_writer() << tr("Debug: parse_article_metadata: ") << result.error;
+      return false;
+    }
+
+    result.success = true;
+    //message_writer() << tr("Debug: parse_article_metadata: Completed (string format)");
+    return true;
+  }
+}
+//----------------------------------------------------------------------------------------------------
+#include <common/util.h> // For epee::to_hex
+#include <string_tools.h> // For epee::string_tools
+
+bool simple_wallet::show_article(const std::vector<std::string>& args)
+{
+  // Check if transaction ID is provided
+  if (args.empty())
+  {
+    message_writer() << tr("Error: Transaction ID not provided");
+    return false;
+  }
+
+  // Parse transaction ID
+  crypto::hash txid;
+  if (!epee::string_tools::hex_to_pod(args[0], txid))
+  {
+    message_writer() << tr("Error: Invalid transaction ID format");
+    return false;
+  }
+
+  // Retrieve transaction using RPC
+  cryptonote::COMMAND_RPC_GET_TRANSACTIONS::request req{};
+  cryptonote::COMMAND_RPC_GET_TRANSACTIONS::response res{};
+  req.txs_hashes.push_back(epee::string_tools::pod_to_hex(txid));
+  req.decode_as_json = false;
+  req.prune = false;
+  req.split = false;
+
+  if (!m_wallet->invoke_http_json("/get_transactions", req, res) || res.txs.empty())
+  {
+    fail_msg_writer() << tr("Failed to retrieve transaction");
+    return false;
+  }
+
+  // Convert transaction hex to binary blob
+  std::string tx_blob;
+  if (!epee::string_tools::parse_hexstr_to_binbuff(res.txs[0].as_hex, tx_blob))
+  {
+    message_writer() << tr("Error: Failed to parse transaction hex");
+    return false;
+  }
+
+  // Parse transaction from blob
+  cryptonote::transaction tx;
+  if (!cryptonote::parse_and_validate_tx_from_blob(tx_blob, tx))
+  {
+    message_writer() << tr("Error: Failed to parse transaction blob");
+    return false;
+  }
+
+  // Log raw extra field for debugging
+  //message_writer() << tr("Debug: Raw tx.extra (hex): ") << epee::to_hex::string(epee::span<const uint8_t>(tx.extra.data(), tx.extra.size()));
+
+  // Parse tx_extra fields
+  std::vector<cryptonote::tx_extra_field> tx_extra_fields;
+  if (!cryptonote::parse_tx_extra(tx.extra, tx_extra_fields))
+  {
+    message_writer() << tr("Error: Failed to parse transaction extra data");
+    return false;
+  }
+
+  // Log parsed extra fields for debugging
+  //message_writer() << tr("Debug: Number of tx_extra_fields: ") << tx_extra_fields.size();
+  for (size_t i = 0; i < tx_extra_fields.size(); ++i)
+  {
+    //message_writer() << tr("Debug: Extra field ") << i << tr(" type: ") << typeid(tx_extra_fields[i]).name();
+  }
+
+  // Extract tx_extra_nonce
+  cryptonote::tx_extra_nonce nonce;
+  if (!cryptonote::find_tx_extra_field_by_type(tx_extra_fields, nonce))
+  {
+    message_writer() << tr("Error: No nonce field found in transaction");
+    return false;
+  }
+
+  // Check for ARTC prefix and deserialize article data
+  std::string extra_str(nonce.nonce.begin(), nonce.nonce.end());
+  //message_writer() << tr("Debug: Raw nonce (hex): ") << epee::to_hex::string(epee::span<const uint8_t>(reinterpret_cast<const uint8_t*>(extra_str.data()), extra_str.size()));
+
+  cryptonote::tx_extra_article_info article_info;
+  // Handle double ARTC prefix
+  size_t pos = 0;
+  if (extra_str.size() >= 8 && extra_str.substr(0, 4) == "ARTC" && extra_str.substr(4, 4) == "ARTC")
+  {
+    //message_writer() << tr("Debug: Found double ARTC prefix, skipping 8 bytes");
+    pos = 8; // Skip both ARTC prefixes
+  }
+  else if (extra_str.size() >= 4 && extra_str.substr(0, 4) == "ARTC")
+  {
+    //message_writer() << tr("Debug: Found single ARTC prefix, skipping 4 bytes");
+    pos = 4; // Skip single ARTC prefix
+  }
+  else
+  {
+    message_writer() << tr("Error: No article data (ARTC prefix) found in nonce");
+    return false;
+  }
+
+  try
+  {
+    uint8_t title_len = static_cast<uint8_t>(extra_str[pos++]);
+    if (pos + title_len > extra_str.size())
+    {
+      message_writer() << tr("Error: Invalid title length");
+      return false;
+    }
+    article_info.title = extra_str.substr(pos, title_len);
+    pos += title_len;
+
+    if (pos + 2 > extra_str.size())
+    {
+      message_writer() << tr("Error: Incomplete content data");
+      return false;
+    }
+    uint16_t content_len = (static_cast<uint8_t>(extra_str[pos]) << 8) | static_cast<uint8_t>(extra_str[pos + 1]);
+    pos += 2;
+    if (pos + content_len > extra_str.size())
+    {
+      message_writer() << tr("Error: Invalid content length");
+      return false;
+    }
+    article_info.content = extra_str.substr(pos, content_len);
+    pos += content_len;
+
+    if (pos >= extra_str.size())
+    {
+      message_writer() << tr("Error: Incomplete publisher data");
+      return false;
+    }
+    uint8_t publisher_len = static_cast<uint8_t>(extra_str[pos++]);
+    if (pos + publisher_len > extra_str.size())
+    {
+      message_writer() << tr("Error: Invalid publisher length");
+      return false;
+    }
+    article_info.publisher = extra_str.substr(pos, publisher_len);
+
+    //message_writer() << tr("Debug: Manual deserialization successful");
+  }
+  catch (const std::exception& e)
+  {
+    message_writer() << tr("Error: Manual deserialization failed: ") << e.what();
+    return false;
+  }
+
+  // Verify content hash
+  crypto::hash content_hash;
+  crypto::cn_fast_hash(article_info.content.data(), article_info.content.size(), content_hash);
+
+  // Display article information
+  message_writer() << tr("Article Information:");
+  message_writer() << tr("Title: ") << article_info.title;
+  message_writer() << tr("Publisher: ") << article_info.publisher;
+  message_writer() << tr("Content: ") << article_info.content;
+  message_writer() << tr("Content Hash: ") << epee::string_tools::pod_to_hex(content_hash);
+
+  return true;
+}
+//---------------------------------------------------------------------
+static void add_data_to_tx_extras(std::vector<uint8_t>& tx_extra, const std::string& data, uint8_t tag) {
+  //message_writer() << tr("Debug: add_data_to_tx_extra: Starting, tag: ") << static_cast<int>(tag) << ", size: " << data.size();
+  try {
+    size_t pos = tx_extra.size();
+    tx_extra.resize(tx_extra.size() + 1 + 1 + data.size()); // 1 for tag, 1 for length
+    tx_extra[pos] = tag;
+    tx_extra[pos + 1] = static_cast<uint8_t>(data.size());
+    std::memcpy(&tx_extra[pos + 2], data.data(), data.size());
+    //message_writer() << tr("Debug: add_data_to_tx_extra: Completed, new tx_extra size: ") << tx_extra.size();
+  } catch (const std::exception& e) {
+    //message_writer() << tr("Debug: add_data_to_tx_extra: Exception: ") << e.what();
+    throw;
+  }
 }
 
-//----------------------------------------------------------------------------------------------------
-bool simple_wallet::article_main(int transfer_type, const std::vector<std::string> &args_, bool called_by_mms)
-{
-//  "transfer [index=<N1>[,<N2>,...]] [<priority>] <address> <amount> [<payment_id>]"
-  if (!try_connect_to_daemon())
+bool simple_wallet::article_main(int transfer_type, const std::vector<std::string>& args_, bool called_by_mms) {
+  //message_writer() << tr("Debug: Entering article_main, transfer_type: ") << transfer_type;
+  if (!try_connect_to_daemon()) {
+    //message_writer() << tr("Debug: Failed to connect to daemon");
+    fail_msg_writer() << tr("Failed to connect to daemon");
     return false;
+  }
+  //message_writer() << tr("Debug: Connected to daemon");
+  message_writer() << tr("Wallet network type: ") << (m_wallet->nettype() == cryptonote::MAINNET ? "mainnet" : m_wallet->nettype() == cryptonote::TESTNET ? "testnet" : "stagenet");
 
   std::vector<std::string> local_args = args_;
+  std::string title, content, publisher, address, amount_str;
 
-  std::vector<uint8_t> extra;
-
-  // Early check for article metadata format
-  bool has_article_metadata = (
-    local_args.size() >= 3 &&
-    local_args[0].rfind("article_title=", 0) == 0 &&
-    local_args[1].rfind("article_content=", 0) == 0 &&
-    local_args[2].rfind("article_publisher=", 0) == 0
-  );
-
-  if (has_article_metadata)
-  {
-    std::string title = local_args[0].substr(strlen("article_title="));
-    std::string content = local_args[1].substr(strlen("article_content="));
-    std::string publisher = local_args[2].substr(strlen("article_publisher="));
-
-    if (title.empty() || content.empty() || publisher.empty())
-    {
-      fail_msg_writer() << "Missing article metadata fields: title/content/publisher.";
+  // Handle interactive mode
+  if (local_args.empty()) {
+    //message_writer() << tr("Debug: No arguments provided, entering interactive mode");
+    title = input_line(tr("Enter article title (max 128 characters):"));
+    if (std::cin.eof()) {
+      fail_msg_writer() << tr("Input cancelled");
       return false;
     }
-
-    if (title.size() > 128 || content.size() > 2048 || publisher.size() > 64)
-    {
-      fail_msg_writer() << "Article metadata too long (title ≤ 128, content ≤ 2048, publisher ≤ 64)";
+    content = input_line(tr("Enter article content (max 2048 characters):"));
+    if (std::cin.eof()) {
+      fail_msg_writer() << tr("Input cancelled");
       return false;
     }
-
-    std::ostringstream oss;
-    oss << "TITLE:" << title << ";CONTENT:" << content << ";PUBLISHER:" << publisher;
-    std::string blob = oss.str();
-
-    if (blob.size() > 255)
-    {
-      fail_msg_writer() << "Serialized article data too large for tx_extra.";
+    publisher = input_line(tr("Enter article publisher (max 64 characters, optional):"));
+    if (std::cin.eof()) {
+      fail_msg_writer() << tr("Input cancelled");
       return false;
     }
+    address = input_line(tr("Enter destination address:"));
+    if (std::cin.eof()) {
+      fail_msg_writer() << tr("Input cancelled");
+      return false;
+    }
+    amount_str = input_line(tr("Enter amount:"));
+    if (std::cin.eof()) {
+      fail_msg_writer() << tr("Input cancelled");
+      return false;
+    }
+  } else {
+    // Parse non-interactive arguments
+    //message_writer() << tr("Debug: Arguments provided, parsing args");
+    if (args_.size() < 5) {
+      fail_msg_writer() << tr("Usage: add_article <title words> : <content words> : <publisher words> <address> <amount>");
+      return false;
+    }
+    size_t sep1 = std::find(local_args.begin(), local_args.end(), ":") - local_args.begin();
+    size_t sep2 = std::find(local_args.begin() + sep1 + 1, local_args.end(), ":") - local_args.begin();
+    if (sep1 >= local_args.size() || sep2 >= local_args.size() || sep2 <= sep1 + 1) {
+      fail_msg_writer() << tr("Missing ':' separators. Use format: <title...> : <content...> : <publisher...> <address> <amount>");
+      return false;
+    }
+    for (size_t i = 0; i < sep1; ++i) {
+      title += local_args[i] + " ";
+    }
+    for (size_t i = sep1 + 1; i < sep2; ++i) {
+      content += local_args[i] + " ";
+    }
+    for (size_t i = sep2 + 1; i < local_args.size() - 2; ++i) {
+      publisher += local_args[i] + " ";
+    }
+    if (!title.empty()) title.pop_back();
+    if (!content.empty()) content.pop_back();
+    if (!publisher.empty()) publisher.pop_back();
+    address = local_args[local_args.size() - 2];
+    amount_str = local_args[local_args.size() - 1];
+    local_args.erase(local_args.begin(), local_args.end() - 2);
+  }
 
-if (!set_article_to_tx_extra(extra, title, content, publisher)) {
-  fail_msg_writer() << "Failed to encode article metadata into tx_extra";
+  // Validate article metadata
+  //message_writer() << tr("Debug: Validating article metadata");
+  if (title.empty() || content.empty()) {
+    fail_msg_writer() << tr("Missing article metadata fields: title or content.");
+    return false;
+  }
+  if (publisher.empty()) {
+    publisher = "Unknown";
+  }
+  if (title.size() > 128 || content.size() > 2048 || publisher.size() > 64) {
+    fail_msg_writer() << tr("Article metadata too long (title ≤ 128, content ≤ 2048, publisher ≤ 64)");
+    return false;
+  }
+
+// Encode article metadata
+std::vector<uint8_t> extra;
+//message_writer() << tr("Debug: Before calling set_article_to_tx_extra");
+article_metadata article_meta = set_article_to_tx_extra(title, content, publisher);
+if (!article_meta.success) {
+  fail_msg_writer() << tr("Failed to process article: ") << article_meta.error;
   return false;
 }
 
-    // Remove metadata args
-    local_args.erase(local_args.begin(), local_args.begin() + 3);
-  }
+//message_writer() << tr("Debug: Adding article metadata to tx_extra");
+std::string extra_nonce = article_meta.serialized_blob; // Remove extra "ARTC"
+if (!add_extra_nonce_to_tx_extra(extra, extra_nonce)) {
+  fail_msg_writer() << tr("Failed to add article metadata to tx_extra");
+  return false;
+}
+  //message_writer() << tr("Debug: Article metadata encoded");
+  message_writer() << tr("Warning: Article metadata will be stored unencrypted in the transaction's tx_extra field and visible on the blockchain.");
 
+  // Handle subaddress indices
   std::set<uint32_t> subaddr_indices;
-  if (local_args.size() > 0 && local_args[0].substr(0, 6) == "index=")
-  {
+  if (!local_args.empty() && local_args[0].substr(0, 6) == "index=") {
+    //message_writer() << tr("Debug: Parsing subaddress indices");
     std::string parse_subaddr_err;
-    if (!tools::parse_subaddress_indices(local_args[0], subaddr_indices, &parse_subaddr_err))
-    {
+    if (!tools::parse_subaddress_indices(local_args[0], subaddr_indices, &parse_subaddr_err)) {
       fail_msg_writer() << parse_subaddr_err;
-      return true;
+      return false;
     }
     local_args.erase(local_args.begin());
+    //message_writer() << tr("Debug: Subaddress indices parsed: ") << subaddr_indices.size();
   }
 
+  // Handle priority
   uint32_t priority = 0;
-  if (local_args.size() > 0 && tools::parse_priority(local_args[0], priority))
+  if (!local_args.empty() && tools::parse_priority(local_args[0], priority)) {
+    //message_writer() << tr("Debug: Parsing priority");
     local_args.erase(local_args.begin());
-
+  }
   priority = m_wallet->adjust_priority(priority);
+  //message_writer() << tr("Debug: Adjusted priority: ") << priority;
 
-  const size_t min_args = (transfer_type == TransferLocked) ? 2 : 1;
-  if(local_args.size() < min_args)
-  {
-     fail_msg_writer() << tr("wrong number of arguments");
-     return false;
+  // Check remaining arguments
+  //message_writer() << tr("Debug: Checking remaining arguments, local_args.size: ") << local_args.size() << ", transfer_type: " << transfer_type;
+  const size_t min_args = (transfer_type == TransferLocked) ? 2 : (local_args.empty() ? 0 : 1);
+  if (local_args.size() < min_args) {
+    fail_msg_writer() << tr("wrong number of arguments");
+    return false;
   }
 
+  // Handle payment ID
   bool payment_id_seen = false;
-  if (!local_args.empty())
-  {
+  if (!local_args.empty()) {
     std::string payment_id_str = local_args.back();
     crypto::hash payment_id;
-    bool r = true;
-    if (tools::wallet2::parse_long_payment_id(payment_id_str, payment_id))
-    {
-      LONG_PAYMENT_ID_SUPPORT_CHECK();
-
+    //message_writer() << tr("Debug: Checking for payment ID");
+    if (tools::wallet2::parse_long_payment_id(payment_id_str, payment_id)) {
+      //message_writer() << tr("Debug: Found payment ID: ") << payment_id_str;
       std::string extra_nonce;
       set_payment_id_to_tx_extra_nonce(extra_nonce, payment_id);
-      r = add_extra_nonce_to_tx_extra(extra, extra_nonce);
+      if (!add_extra_nonce_to_tx_extra(extra, extra_nonce)) {
+        fail_msg_writer() << tr("payment id failed to encode");
+        return false;
+      }
       local_args.pop_back();
       payment_id_seen = true;
+      //message_writer() << tr("Debug: Added payment ID to tx_extra");
       message_writer() << tr("Unencrypted payment IDs are bad for privacy: ask the recipient to use subaddresses instead");
     }
-    if(!r)
-    {
-      fail_msg_writer() << tr("payment id failed to encode");
-      return false;
-    }
   }
 
+  // Handle locked blocks for TransferLocked
   uint64_t locked_blocks = 0;
-  if (transfer_type == TransferLocked)
-  {
-    if (!locked_blocks_arg_valid(local_args.back(), locked_blocks))
-    {
-      return true;
+  if (transfer_type == TransferLocked) {
+    //message_writer() << tr("Debug: Handling locked transfer");
+    if (!local_args.empty() && !locked_blocks_arg_valid(local_args.back(), locked_blocks)) {
+      fail_msg_writer() << tr("Invalid locked blocks value");
+      return false;
     }
-    local_args.pop_back();
+    if (!local_args.empty()) {
+      local_args.pop_back();
+    }
   }
 
-  vector<cryptonote::address_parse_info> dsts_info;
-  vector<cryptonote::tx_destination_entry> dsts;
+  // Parse destination
+  message_writer() << tr("Debug: Parsing destination");
+  std::vector<cryptonote::address_parse_info> dsts_info;
+  std::vector<cryptonote::tx_destination_entry> dsts;
   size_t num_subaddresses = 0;
-  for (size_t i = 0; i < local_args.size(); )
-  {
-    dsts_info.emplace_back();
-    cryptonote::address_parse_info & info = dsts_info.back();
-    cryptonote::tx_destination_entry de;
-    bool r = true;
+  dsts_info.emplace_back();
+  cryptonote::address_parse_info &info = dsts_info.back();
+  cryptonote::tx_destination_entry de;
+  bool r = true;
 
-    // check for a URI
-    std::string address_uri, payment_id_uri, tx_description, recipient_name, error;
-    std::vector<std::string> unknown_parameters;
-    uint64_t amount = 0;
-    bool has_uri = m_wallet->parse_uri(local_args[i], address_uri, payment_id_uri, amount, tx_description, recipient_name, unknown_parameters,
-    error);
-    if (has_uri)
-    {
-      r = cryptonote::get_account_address_from_str_or_url(info, m_wallet->nettype(), address_uri, oa_prompter);
-      if (payment_id_uri.size() == 16)
-      {
-        if (!tools::wallet2::parse_short_payment_id(payment_id_uri, info.payment_id))
-        {
-          fail_msg_writer() << tr("failed to parse short payment ID from URI");
-          return false;
-        }
-        info.has_payment_id = true;
-      }
-      de.amount = amount;
-      de.original = local_args[i];
-      ++i;
-    }
-    else if (i + 1 < local_args.size())
-    {
-      r = cryptonote::get_account_address_from_str_or_url(info, m_wallet->nettype(), local_args[i], oa_prompter);
-      bool ok = cryptonote::parse_amount(de.amount, local_args[i + 1]);
-      if(!ok || 0 == de.amount)
-      {
-        fail_msg_writer() << tr("amount is wrong: ") << local_args[i] << ' ' << local_args[i + 1] <<
-          ", " << tr("expected number from 0 to ") << print_money(std::numeric_limits<uint64_t>::max());
-        return false;
-      }
-      de.original = local_args[i];
-      i += 2;
-    }
-    else
-    {
-      if (boost::starts_with(local_args[i], "antd:"))
-        fail_msg_writer() << tr("Invalid last argument: ") << local_args.back() << ": " << error;
-      else
-        fail_msg_writer() << tr("Invalid last argument: ") << local_args.back();
-      return false;
-    }
-
-    if (!r)
-    {
-      fail_msg_writer() << tr("failed to parse address");
-      return false;
-    }
-    de.addr = info.address;
-    de.is_subaddress = info.is_subaddress;
-    de.is_integrated = info.has_payment_id;
-    num_subaddresses += info.is_subaddress;
-
-    if (info.has_payment_id || !payment_id_uri.empty())
-    {
-      if (payment_id_seen)
-      {
-        fail_msg_writer() << tr("a single transaction cannot use more than one payment id");
-        return false;
-      }
-
-      crypto::hash payment_id;
-      std::string extra_nonce;
-      if (info.has_payment_id)
-      {
-        set_encrypted_payment_id_to_tx_extra_nonce(extra_nonce, info.payment_id);
-      }
-      else if (tools::wallet2::parse_payment_id(payment_id_uri, payment_id))
-      {
-        LONG_PAYMENT_ID_SUPPORT_CHECK();
-        set_payment_id_to_tx_extra_nonce(extra_nonce, payment_id);
-        message_writer() << tr("Unencrypted payment IDs are bad for privacy: ask the recipient to use subaddresses instead");
-      }
-      else
-      {
-        fail_msg_writer() << tr("failed to parse payment id, though it was detected");
-        return false;
-      }
-      bool r = add_extra_nonce_to_tx_extra(extra, extra_nonce);
-      if(!r)
-      {
-        fail_msg_writer() << tr("failed to set up payment id, though it was decoded correctly");
-        return false;
-      }
-      payment_id_seen = true;
-    }
-
-    dsts.push_back(de);
+  // Handle antd: prefix
+  if (boost::starts_with(address, "antd:")) {
+    message_writer() << tr("Debug: Stripping antd: prefix from address");
+    address = address.substr(5);
   }
 
-  // prompt is there is no payment id and confirmation is required
-  if (m_long_payment_id_support && !payment_id_seen && m_wallet->confirm_missing_payment_id() && dsts.size() > num_subaddresses)
-  {
-     std::string accepted = input_line(tr("No payment id is included with this transaction. Is this okay?"), true);
-     if (std::cin.eof())
-       return false;
-     if (!command_line::is_yes(accepted))
-     {
-       fail_msg_writer() << tr("transaction cancelled.");
-
-       return false;
-     }
+  // Check for a URI
+  std::string address_uri, payment_id_uri, tx_description, recipient_name, error;
+  std::vector<std::string> unknown_parameters;
+  uint64_t amount = 0;
+  bool has_uri = m_wallet->parse_uri(address, address_uri, payment_id_uri, amount, tx_description, recipient_name, unknown_parameters, error);
+  if (has_uri) {
+    message_writer() << tr("Debug: Parsing URI: ") << address;
+    r = cryptonote::get_account_address_from_str_or_url(info, m_wallet->nettype(), address_uri, oa_prompter);
+    if (payment_id_uri.size() == 16) {
+      if (!tools::wallet2::parse_short_payment_id(payment_id_uri, info.payment_id)) {
+        fail_msg_writer() << tr("failed to parse short payment ID from URI");
+        return false;
+      }
+      info.has_payment_id = true;
+    }
+    de.amount = amount;
+    de.original = address;
+  } else {
+    message_writer() << tr("Debug: Parsing address: ") << address;
+    r = cryptonote::get_account_address_from_str_or_url(info, m_wallet->nettype(), address, oa_prompter);
+    bool ok = cryptonote::parse_amount(de.amount, amount_str);
+    if (!ok || 0 == de.amount) {
+      fail_msg_writer() << tr("amount is wrong: ") << address << ' ' << amount_str <<
+        ", " << tr("expected number from 0 to ") << print_money(std::numeric_limits<uint64_t>::max());
+      return false;
+    }
+    de.amount *= 1ULL; // Convert to atomic units (12 decimal places)
+    de.original = address;
   }
 
-  SCOPED_WALLET_UNLOCK_ON_BAD_PASSWORD(return false;);
+  if (!r) {
+    fail_msg_writer() << tr("failed to parse address");
+    return false;
+  }
+  de.addr = info.address;
+  de.is_subaddress = info.is_subaddress;
+  de.is_integrated = info.has_payment_id;
+  num_subaddresses += info.is_subaddress;
+  dsts.push_back(de);
 
+  if (info.has_payment_id || !payment_id_uri.empty()) {
+    if (payment_id_seen) {
+      fail_msg_writer() << tr("a single transaction cannot use more than one payment id");
+      return false;
+    }
+    crypto::hash payment_id;
+    std::string extra_nonce;
+    if (info.has_payment_id) {
+      set_encrypted_payment_id_to_tx_extra_nonce(extra_nonce, info.payment_id);
+    } else if (tools::wallet2::parse_payment_id(payment_id_uri, payment_id)) {
+      LONG_PAYMENT_ID_SUPPORT_CHECK();
+      set_payment_id_to_tx_extra_nonce(extra_nonce, payment_id);
+      message_writer() << tr("Unencrypted payment IDs are bad for privacy: ask the recipient to use subaddresses instead");
+    } else {
+      fail_msg_writer() << tr("failed to parse payment id, though it was detected");
+      return false;
+    }
+    if (!add_extra_nonce_to_tx_extra(extra, extra_nonce)) {
+      fail_msg_writer() << tr("failed to set up payment id, though it was decoded correctly");
+      return false;
+    }
+    payment_id_seen = true;
+  }
+
+  if (m_long_payment_id_support && !payment_id_seen && m_wallet->confirm_missing_payment_id() && dsts.size() > num_subaddresses && local_args.empty()) {
+    message_writer() << tr("Debug: Prompting for missing payment ID");
+    std::string accepted = input_line(tr("No payment id is included with this transaction. Is this okay?"), true);
+    if (std::cin.eof()) return false;
+    if (!command_line::is_yes(accepted)) {
+      fail_msg_writer() << tr("transaction cancelled.");
+      return false;
+    }
+  }
+
+  // Check wallet balance
+  message_writer() << tr("Debug: Checking wallet balance for account: ") << m_current_subaddress_account;
+  uint64_t balance = m_wallet->balance(m_current_subaddress_account);
+  uint64_t unlocked_balance = m_wallet->unlocked_balance(m_current_subaddress_account);
+  message_writer() << tr("Debug: Wallet balance: ") << print_money(balance) << ", Unlocked balance: " << print_money(unlocked_balance);
+  if (unlocked_balance < de.amount) {
+    fail_msg_writer() << tr("Insufficient unlocked funds: balance ") << print_money(balance) << ", unlocked " << print_money(unlocked_balance) << ", required " << print_money(de.amount);
+    return false;
+  }
+
+  message_writer() << tr("Debug: Unlocking wallet");
+  SCOPED_WALLET_UNLOCK_ON_BAD_PASSWORD({
+    fail_msg_writer() << tr("Invalid wallet password");
+    return false;
+  });
   try
   {
     // figure out what tx will be necessary

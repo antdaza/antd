@@ -2733,4 +2733,41 @@ namespace cryptonote
     };
   };
 
+  struct COMMAND_RPC_SHOW_ARTICLE
+  {
+    struct request
+    {
+      std::string txid; // Transaction hash as hex string
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(txid)
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::string status;
+      bool in_pool;
+      uint64_t block_height;
+      bool article_found;
+      std::string title;
+      std::string content;
+      std::string publisher;
+      std::string content_hash;
+      std::string tx_extra_nonce_hex;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(status)
+        KV_SERIALIZE(in_pool)
+        KV_SERIALIZE(block_height)
+        KV_SERIALIZE(article_found)
+        KV_SERIALIZE(title)
+        KV_SERIALIZE(content)
+        KV_SERIALIZE(publisher)
+        KV_SERIALIZE(content_hash)
+        KV_SERIALIZE(tx_extra_nonce_hex)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
 }

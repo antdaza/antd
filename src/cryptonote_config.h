@@ -42,7 +42,7 @@
 #define CRYPTONOTE_GETBLOCKTEMPLATE_MAX_BLOCK_SIZE	196608 //size of block (bytes) that is the maximum that miners will produce
 #define CRYPTONOTE_MAX_TX_SIZE                          1000000000
 #define CRYPTONOTE_PUBLIC_ADDRESS_TEXTBLOB_VER          0
-#define CRYPTONOTE_MINED_MONEY_UNLOCK_WINDOW            33
+#define CRYPTONOTE_MINED_MONEY_UNLOCK_WINDOW            35
 #define CURRENT_BLOCK_MAJOR_VERSION                     7
 #define CURRENT_BLOCK_MINOR_VERSION                     7
 #define CRYPTONOTE_BLOCK_FUTURE_TIME_LIMIT_V2           60*10
@@ -186,14 +186,14 @@ namespace config
      0x42 ,0x38, 0xF1, 0x71 , 0x61, 0x54 , 0x71, 0x61, 0x17, 0x71, 0x00, 0x82, 0x16, 0xA1, 0xA1, 0x10
     } }; // Bender's nightmare
 
-  std::string const GENESIS_TX = "022101ff0002d593eb94e6cc0702cb2dc0e1f2e6f8ee7a46c5773d40d8e2d4d57e14786bc27086482c288611a7c9e9ec99cb993302a13dc4d7d5d974dbda7c3565aafee932302cda9c277e952a1d71680a6a1aa8844201869acf228322eb4f199eb13775a736b15a2ec7578bce73cdc91eb4d50a0e6a060158666666666666666666666666666666666666666666666666666666666666660000";
-  uint32_t const GENESIS_NONCE = 1788598869;
+  std::string const GENESIS_TX = "022301ff00028090cad2c60e02b1c1bb79af9ba85ec69d48800d929fd67608dec36d35df154076a4858371eeb480d0dbc3f402026ec438f84adde0552a2904d5134eac5bf1c3861599b6da3d8413f08a27c819ef630138dd6b50dd5f169bb07d958cb7cc9db8a4ec949c07a0316bfa0be657701e7a2201c9a3f86aae465f0e56513864510f3997561fa2c9e85ea21dc2292309f3cd602272000000000000000000000000000000000000000000000000000000000000000000";
+  uint32_t const GENESIS_NONCE = 2348261193;
 
   uint64_t const CONTROL_REWARD_INTERVAL_IN_BLOCKS = ((60 * 60 * 24) / DIFFICULTY_TARGET_V2);
   std::string const CONTROL_WALLET_ADDRESS[] =
   {
-    "45DTM8mzvYFUqFb4VQwyUX422Rif3gyqgdsUb58aWGx2Nqa4F3F6YkMGEAKm5rHAmPSxmX1fQ7UqUckEiZBe3gFK8vH6tZP", // hardfork v7-10
-    "45DTM8mzvYFUqFb4VQwyUX422Rif3gyqgdsUb58aWGx2Nqa4F3F6YkMGEAKm5rHAmPSxmX1fQ7UqUckEiZBe3gFK8vH6tZP",
+    "42vWjFVmBWxLZPy411oPVwgoUdU5yTg8xCiPwE8BWEPT7KhaTAqVsSQh1jfzfUzNtfZ3wS5FCY5MFCJuB6dRpq65QjG6XTq", // hardfork v7-10
+    "42vWjFVmBWxLZPy411oPVwgoUdU5yTg8xCiPwE8BWEPT7KhaTAqVsSQh1jfzfUzNtfZ3wS5FCY5MFCJuB6dRpq65QjG6XTq",
   };
 
   // Hash domain separators
@@ -266,6 +266,7 @@ namespace cryptonote
     network_version_9_full_nodes, // Proof Of Stake w/ Full Nodes
     network_version_10_bulletproofs, // Bulletproofs, Full Node Grace Registration Period, Batched Control
     network_version_11_infinite_staking,
+    network_version_12,
 
     network_version_count,
   };

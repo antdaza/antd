@@ -2711,4 +2711,155 @@ namespace cryptonote
     return true;
   }
 
+  bool parse_article_from_nonce(const std::vector<uint8_t>& nonce, tx_extra_article_info& article_info, std::string& content_hash, std::string& nonce_hex)
+  {
+    nonce_hex = epee::to_hex::string(epee::span<const uint8_t>(nonce.data(), nonce.size()));
+    std::string extra_str(nonce.begin(), nonce.end());
+    size_t pos = 0;
+
+    if (extra_str.size() >= 8 && extra_str.substr(0, 4) == "ARTC" && extra_str.substr(4, 4) == "ARTC")
+    {
+      pos = 8; // Skip double ARTC prefix
+    }
+    else if (extra_str.size() >= 4 && extra_str.substr(0, 4) == "ARTC")
+    {
+      pos = 4; // Skip single ARTC prefix
+    }
+    else
+    {
+      return false;
+    }
+
+    try
+    {
+      if (pos >= extra_str.size()) return false;
+      uint8_t title_len = static_cast<uint8_t>(extra_str[pos++]);
+      if (pos + title_len > extra_str.size()) return false;
+      article_info.title = extra_str.substr(pos, title_len);
+      pos += title_len;
+
+      if (pos + 2 > extra_str.size()) return false;
+      uint16_t content_len = (static_cast<uint8_t>(extra_str[pos]) << 8) | static_cast<uint8_t>(extra_str[pos + 1]);
+      pos += 2;
+      if (pos + content_len > extra_str.size()) return false;
+      article_info.content = extra_str.substr(pos, content_len);
+      pos += content_len;
+
+      if (pos >= extra_str.size()) return false;
+      uint8_t publisher_len = static_cast<uint8_t>(extra_str[pos++]);
+      if (pos + publisher_len > extra_str.size()) return false;
+      article_info.publisher = extra_str.substr(pos, publisher_len);
+
+      crypto::hash hash;
+      crypto::cn_fast_hash(article_info.content.data(), article_info.content.size(), hash);
+      content_hash = epee::string_tools::pod_to_hex(hash);
+      return true;
+    }
+    catch (const std::exception&)
+    {
+      return false;
+    }
+  }
+
+bool core_rpc_server::on_show_article(const COMMAND_RPC_SHOW_ARTICLE::request& req,
+                                      COMMAND_RPC_SHOW_ARTICLE::response& res, epee::json_rpc::error& error_resp,
+                                      const connection_context* ctx)
+{
+  PERF_TIMER(on_show_article);
+
+  // Parse transaction hash
+  crypto::hash txid;
+  if (!epee::string_tools::hex_to_pod(req.txid, txid))
+  {
+    res.status = "Invalid TXID format";
+    return false;
+  }
+
+  // Transaction blob
+  cryptonote::blobdata tx_blob;
+  bool in_pool = false;
+  uint64_t block_height = 0;
+
+  // Check pool first
+  {
+    cryptonote::transaction tx;
+    if (m_core.get_pool_transaction(txid, tx_blob))
+    {
+      in_pool = true;
+      tx_blob = cryptonote::tx_to_blob(tx);
+    }
+  }
+
+  // Check blockchain if not in pool
+  if (!in_pool)
+  {
+    std::vector<cryptonote::transaction> txs;
+    std::vector<crypto::hash> missed_txs;
+    std::vector<crypto::hash> txids = {txid};
+
+    if (!m_core.get_transactions(txids, txs, missed_txs) || !missed_txs.empty())
+    {
+      res.status = "Transaction not found";
+      return false;
+    }
+
+    tx_blob = cryptonote::tx_to_blob(txs[0]);
+
+    // Try getting block height of the tx
+    try
+    {
+      block_height = m_core.get_blockchain_storage().get_db().get_tx_block_height(txid);
+    }
+    catch (const std::exception& e)
+    {
+      MERROR("Failed to get block height: " << e.what());
+    }
+  }
+
+  if (tx_blob.empty())
+  {
+    res.status = "Transaction blob is empty";
+    return false;
+  }
+
+  // Parse transaction
+  cryptonote::transaction tx;
+  if (!cryptonote::parse_and_validate_tx_from_blob(tx_blob, tx))
+  {
+    res.status = "Failed to parse transaction";
+    return false;
+  }
+
+  // Parse tx_extra for article
+  std::vector<cryptonote::tx_extra_field> tx_extra_fields;
+  res.article_found = false;
+
+  if (cryptonote::parse_tx_extra(tx.extra, tx_extra_fields))
+  {
+    cryptonote::tx_extra_nonce nonce;
+    if (cryptonote::find_tx_extra_field_by_type(tx_extra_fields, nonce))
+    {
+      cryptonote::tx_extra_article_info article_info;
+      std::string content_hash;
+
+      // Convert nonce.nonce (string) to vector<uint8_t>
+      std::vector<uint8_t> nonce_bytes(nonce.nonce.begin(), nonce.nonce.end());
+
+      if (parse_article_from_nonce(nonce_bytes, article_info, content_hash, res.tx_extra_nonce_hex))
+      {
+        res.article_found = true;
+        res.title = article_info.title;
+        res.content = article_info.content;
+        res.publisher = article_info.publisher;
+        res.content_hash = content_hash;
+      }
+    }
+  }
+
+  res.in_pool = in_pool;
+  res.block_height = block_height;
+  res.status = CORE_RPC_STATUS_OK;
+  return true;
+}
+
 }  // namespace cryptonote

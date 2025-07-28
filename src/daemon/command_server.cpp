@@ -94,6 +94,12 @@ t_command_server::t_command_server(
     , "Print a given block."
     );
   m_command_lookup.set_handler(
+      "show_article"
+    , std::bind(&t_command_parser_executor::show_article, &m_parser, p::_1)
+    , "show_article <txid>"
+    , "Show article data from a transaction."
+    );
+  m_command_lookup.set_handler(
       "print_tx"
     , std::bind(&t_command_parser_executor::print_transaction, &m_parser, p::_1)
     , "print_tx <transaction_hash> [+hex] [+json]"

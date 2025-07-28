@@ -30,6 +30,11 @@
 
 #pragma once
 
+#include "crypto/crypto.h" // For crypto::public_key, crypto::signature
+#include "serialization/keyvalue_serialization.h" // For BEGIN_KV_SERIALIZE_MAP, KV_SERIALIZE, etc.
+#include <vector>
+#include <string>
+
 #define TX_EXTRA_PADDING_MAX_COUNT            255
 #define TX_EXTRA_NONCE_MAX_COUNT              255
 
@@ -114,10 +119,10 @@ namespace cryptonote
   {
     std::string nonce;
 
-    BEGIN_SERIALIZE()
-      FIELD(nonce)
-      if(TX_EXTRA_NONCE_MAX_COUNT < nonce.size()) return false;
-    END_SERIALIZE()
+   BEGIN_SERIALIZE()
+     FIELD(nonce)
+     if(TX_EXTRA_NONCE_MAX_COUNT < nonce.size()) return false;
+   END_SERIALIZE()
   };
 
   struct tx_extra_merge_mining_tag

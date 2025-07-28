@@ -34,6 +34,7 @@
 #include "wipeable_string.h"
 #include "string_tools.h"
 #include "common/i18n.h"
+//#include "serialization_overrides.h"
 #include "serialization/string.h"
 #include "cryptonote_format_utils.h"
 #include "cryptonote_config.h"
@@ -591,13 +592,28 @@ namespace cryptonote
     return get_tx_pub_key_from_extra(tx.extra, pk_index);
   }
   //---------------------------------------------------------------
-  static void add_data_to_tx_extra(std::vector<uint8_t>& tx_extra, char const *data, size_t data_size, uint8_t tag)
+  void add_data_to_tx_extra(std::vector<uint8_t>& tx_extra, char const *data, size_t data_size, uint8_t tag)
   {
     size_t pos = tx_extra.size();
     tx_extra.resize(tx_extra.size() + sizeof(tag) + data_size);
     tx_extra[pos++] = tag;
     std::memcpy(&tx_extra[pos], data, data_size);
   }
+/*
+void add_data_to_tx_extra(std::vector<uint8_t>& tx_extra, const std::string& data, uint8_t tag) {
+ // message_writer() << tr("Debug: add_data_to_tx_extra: Starting, tag: ") << static_cast<int>(tag) << ", size: ") << data.size();
+  try {
+    size_t pos = tx_extra.size();
+    tx_extra.resize(tx_extra.size() + 1 + 1 + data.size()); // 1 for tag, 1 for length
+    tx_extra[pos] = tag;
+    tx_extra[pos + 1] = static_cast<uint8_t>(data.size());
+    std::memcpy(&tx_extra[pos + 2], data.data(), data.size());
+   // message_writer() << tr("Debug: add_data_to_tx_extra: Completed, new tx_extra size: ") << tx_extra.size();
+  } catch (const std::exception& e) {
+   // message_writer() << tr("Debug: add_data_to_tx_extra: Exception: ") << e.what();
+    throw;
+  }
+}*/
   //---------------------------------------------------------------
   void add_tx_pub_key_to_extra(transaction& tx, const crypto::public_key& tx_pub_key)
   {

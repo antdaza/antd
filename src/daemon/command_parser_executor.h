@@ -83,6 +83,8 @@ public:
 
   bool prepare_registration();
 
+  bool show_article(const std::vector<std::string>& args);
+
   bool print_sn(const std::vector<std::string>& args);
 
   bool print_sn_status(const std::vector<std::string>& args);
