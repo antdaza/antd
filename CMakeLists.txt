@@ -116,11 +116,27 @@ set(CMAKE_FIND_FRAMEWORK "LAST")
 # portable across processors in the same family as host processor.  In cases
 # when ARCH is not set to an explicit identifier, cmake's builtin is used
 # to identify the target architecture, to direct logic in this cmake script.
+# Since ARCH is a cached variable, it will not be set on first cmake
+# ARCH defines the target architecture, either by an explicit identifier or
+# one of the following two keywords. By default, ARCH a value of 'native':
+# target arch = host arch, binary is not portable. When ARCH is set to the
+# string 'default', no -march arg is passed, which creates a binary that is
+# portable across processors in the same family as host processor.  In cases
+# when ARCH is not set to an explicit identifier, cmake's builtin is used
+# to identify the target architecture, to direct logic in this cmake script.
 # Since ARCH is a cached variable, it will not be set on first cmake invocation.
+if (NOT ARCH_ID)
 if (NOT ARCH OR ARCH STREQUAL "" OR ARCH STREQUAL "native" OR ARCH STREQUAL "default")
-  set(ARCH_ID "${CMAKE_SYSTEM_PROCESSOR}")
+  if(CMAKE_SYSTEM_PROCESSOR STREQUAL "")
+    set(CMAKE_SYSTEM_PROCESSOR ${CMAKE_HOST_SYSTEM_PROCESSOR})
+  endif()
+  # On Windows, CMake sets CMAKE{_HOST,}_SYSTEM_PROCESSOR to the value of the
+  # PROCESSOR_ARCHITECTURE environment variable. On some systems it may be set to
+  # AMD64. Lowercase it to ensure checks for "x86_64" or "amd64" work as expected.
+  string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" ARCH_ID)
 else()
   set(ARCH_ID "${ARCH}")
+endif()
 endif()
 string(TOLOWER "${ARCH_ID}" ARM_ID)
 string(SUBSTRING "${ARM_ID}" 0 3 ARM_TEST)
@@ -163,11 +179,27 @@ if(ARCH_ID STREQUAL "s390x")
   set(S390X 1)
 endif()
 
+if(ARCH_ID STREQUAL "riscv64")
+set(RISCV   1)
+set(RISCV64 1)
+endif()
+
+if(ARCH_ID STREQUAL "riscv32")
+set(RISCV   1)
+set(RISCV32 1)
+endif()
+
+if(ARCH_ID STREQUAL "loongarch64")
+set(LOONGARCH   1)
+set(LOONGARCH64 1)
+endif()
+
 if(WIN32 OR ARM OR PPC64LE OR PPC64 OR PPC)
   set(OPT_FLAGS_RELEASE "-O2")
 else()
   set(OPT_FLAGS_RELEASE "-Ofast")
 endif()
+
 
 # BUILD_TAG is used to select the build type to check for a new version
 if(BUILD_TAG)
