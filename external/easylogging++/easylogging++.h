@@ -125,13 +125,18 @@
 #else
 #  define ELPP_OS_NETBSD 0
 #endif
+#if defined(__EMSCRIPTEN__)
+#  define ELPP_OS_EMSCRIPTEN 1
+#else
+#  define ELPP_OS_EMSCRIPTEN 0
+#endif
 #if (defined(__DragonFly__))
 #   define ELPP_OS_DRAGONFLY 1
 #else
 #   define ELPP_OS_DRAGONFLY 0
 #endif
 // Unix
-#if ((ELPP_OS_LINUX || ELPP_OS_MAC || ELPP_OS_FREEBSD || ELPP_OS_NETBSD || ELPP_OS_SOLARIS || ELPP_OS_AIX || ELPP_OS_DRAGONFLY || ELPP_OS_OPENBSD) && (!ELPP_OS_WINDOWS))
+#if ((ELPP_OS_LINUX || ELPP_OS_MAC || ELPP_OS_FREEBSD || ELPP_OS_NETBSD || ELPP_OS_SOLARIS || ELPP_OS_AIX || ELPP_OS_EMSCRIPTEN || ELPP_OS_DRAGONFLY || ELPP_OS_OPENBSD) && (!ELPP_OS_WINDOWS))
 #  define ELPP_OS_UNIX 1
 #else
 #  define ELPP_OS_UNIX 0
@@ -216,7 +221,7 @@ ELPP_INTERNAL_DEBUGGING_OUT_INFO << ELPP_INTERNAL_DEBUGGING_MSG(internalInfoStre
 #  define ELPP_INTERNAL_INFO(lvl, msg)
 #endif  // (defined(ELPP_DEBUG_INFO))
 #if (defined(ELPP_FEATURE_ALL)) || (defined(ELPP_FEATURE_CRASH_LOG))
-#  if (ELPP_COMPILER_GCC && !ELPP_MINGW && !ELPP_OS_OPENBSD && !ELPP_OS_NETBSD && !ELPP_OS_ANDROID)
+#  if (ELPP_COMPILER_GCC && !ELPP_MINGW && !ELPP_OS_OPENBSD && !ELPP_OS_NETBSD && !ELPP_OS_ANDROID && !ELPP_OS_EMSCRIPTEN)
 #    define ELPP_STACKTRACE 1
 #  else
 #    define ELPP_STACKTRACE 0
@@ -359,6 +364,7 @@ ELPP_INTERNAL_DEBUGGING_OUT_INFO << ELPP_INTERNAL_DEBUGGING_MSG(internalInfoStre
 #if defined(ELPP_SYSLOG)
 #   include <syslog.h>
 #endif  // defined(ELPP_SYSLOG)
+#include <climits>
 #include <ctime>
 #include <cstring>
 #include <cstdlib>
@@ -602,7 +608,6 @@ enum class Level : base::type::EnumType {
   /// @brief Represents unknown level
   Unknown = 1010
 };
-
 enum class Color : base::type::EnumType {
   Default,
   Red,
@@ -612,7 +617,6 @@ enum class Color : base::type::EnumType {
   Magenta,
   Cyan,
 };
-
 } // namespace el
 namespace std {
 template<> struct hash<el::Level> {
@@ -2234,7 +2238,8 @@ class LogBuilder : base::NoCopy {
     ELPP_INTERNAL_INFO(3, "Destroying log builder...")
   }
   virtual base::type::string_t build(const LogMessage* logMessage, bool appendNewLine) const = 0;
-  void convertToColoredOutput(base::type::string_t* logLine, Level level);
+  void convertToColoredOutput(base::type::string_t* logLine, Level level, Color color);
+  void setColor(Color color, bool bright);
  private:
   bool m_termSupportsColor;
   friend class el::base::DefaultLogDispatchCallback;
@@ -2458,11 +2463,7 @@ class VRegistry : base::NoCopy, public base::threading::ThreadSafe {
     return m_level;
   }
 
-  inline void clearCategories(void) {
-    base::threading::ScopedLock scopedLock(lock());
-    m_categories.clear();
-    m_cached_allowed_categories.clear();
-  }
+  void clearCategories(void);
 
   inline void clearModules(void) {
     base::threading::ScopedLock scopedLock(lock());
@@ -2475,6 +2476,7 @@ class VRegistry : base::NoCopy, public base::threading::ThreadSafe {
 
   void setModules(const char* modules);
 
+  bool priority_allowed(int priority, const std::string &category);
   bool allowed(Level level, const std::string &category);
 
   bool allowed(base::type::VerboseLevel vlevel, const char* file);
@@ -2510,13 +2512,16 @@ class VRegistry : base::NoCopy, public base::threading::ThreadSafe {
 }  // namespace base
 class LogMessage {
  public:
-  LogMessage(Level level, const std::string& file, base::type::LineNumber line, const std::string& func,
-             base::type::VerboseLevel verboseLevel, Logger* logger) :
-    m_level(level), m_file(file), m_line(line), m_func(func),
-    m_verboseLevel(verboseLevel), m_logger(logger), m_message(logger->stream().str()) {
+  LogMessage(Level level, Color color, const std::string& file, base::type::LineNumber line, const std::string& func,
+             base::type::VerboseLevel verboseLevel, Logger* logger, const base::type::string_t *msg = nullptr) :
+    m_level(level), m_color(color), m_file(file), m_line(line), m_func(func),
+    m_verboseLevel(verboseLevel), m_logger(logger), m_message(msg ? *msg : logger->stream().str()) {
   }
   inline Level level(void) const {
     return m_level;
+  }
+  inline Color color(void) const {
+    return m_color;
   }
   inline const std::string& file(void) const {
     return m_file;
@@ -2538,6 +2543,7 @@ class LogMessage {
   }
  private:
   Level m_level;
+  Color m_color;
   std::string m_file;
   base::type::LineNumber m_line;
   std::string m_func;
@@ -2788,7 +2794,7 @@ class DefaultLogDispatchCallback : public LogDispatchCallback {
   void handle(const LogDispatchData* data);
  private:
   const LogDispatchData* m_data;
-  void dispatch(base::type::string_t&& rawLine, base::type::string_t&& logLine);
+  void dispatch(base::type::string_t&& rawLinePrefix, base::type::string_t&& rawLinePayload, base::type::string_t&& logLine);
 };
 #if ELPP_ASYNC_LOGGING
 class AsyncLogDispatchCallback : public LogDispatchCallback {
@@ -3249,10 +3255,10 @@ class NullWriter : base::NoCopy {
 /// @brief Main entry point of each logging
 class Writer : base::NoCopy {
  public:
-  Writer(Level level, const char* file, base::type::LineNumber line,
+  Writer(Level level, Color color, const char* file, base::type::LineNumber line,
          const char* func, base::DispatchAction dispatchAction = base::DispatchAction::NormalLog,
          base::type::VerboseLevel verboseLevel = 0) :
-    m_msg(nullptr), m_level(level), m_file(file), m_line(line), m_func(func), m_verboseLevel(verboseLevel),
+    m_msg(nullptr), m_level(level), m_color(color), m_file(file), m_line(line), m_func(func), m_verboseLevel(verboseLevel),
     m_logger(nullptr), m_proceed(false), m_dispatchAction(dispatchAction) {
   }
 
@@ -3306,6 +3312,7 @@ class Writer : base::NoCopy {
  protected:
   LogMessage* m_msg;
   Level m_level;
+  Color m_color;
   const char* m_file;
   const base::type::LineNumber m_line;
   const char* m_func;
@@ -3324,10 +3331,10 @@ class Writer : base::NoCopy {
 };
 class PErrorWriter : public base::Writer {
  public:
-  PErrorWriter(Level level, const char* file, base::type::LineNumber line,
+  PErrorWriter(Level level, Color color, const char* file, base::type::LineNumber line,
                const char* func, base::DispatchAction dispatchAction = base::DispatchAction::NormalLog,
                base::type::VerboseLevel verboseLevel = 0) :
-    base::Writer(level, file, line, func, dispatchAction, verboseLevel) {
+    base::Writer(level, color, file, line, func, dispatchAction, verboseLevel) {
   }
 
   virtual ~PErrorWriter(void);
@@ -3360,14 +3367,14 @@ template <typename T>
 void Logger::log_(Level level, int vlevel, const T& log) {
   if (level == Level::Verbose) {
     if (ELPP->vRegistry()->allowed(vlevel, __FILE__)) {
-      base::Writer(Level::Verbose, "FILE", 0, "FUNCTION",
+      base::Writer(Level::Verbose, Color::Default, "FILE", 0, "FUNCTION",
                    base::DispatchAction::NormalLog, vlevel).construct(this, false) << log;
     } else {
       stream().str(ELPP_LITERAL(""));
       releaseLock();
     }
   } else {
-    base::Writer(level, "FILE", 0, "FUNCTION").construct(this, false) << log;
+    base::Writer(level, Color::Default, "FILE", 0, "FUNCTION").construct(this, false) << log;
   }
 }
 template <typename T, typename... Args>
@@ -3467,18 +3474,18 @@ LOGGER_LEVEL_WRITERS_DISABLED(trace, Level::Trace)
 #endif // ELPP_COMPILER_MSVC
 #define el_resolveVALength(_0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, N, ...) N
 #define ELPP_WRITE_LOG(writer, level, dispatchAction, ...) \
-writer(level, __FILE__, __LINE__, ELPP_FUNC, dispatchAction).construct(el_getVALength(__VA_ARGS__), __VA_ARGS__)
+writer(level, el::Color::Default, __FILE__, __LINE__, ELPP_FUNC, dispatchAction).construct(el_getVALength(__VA_ARGS__), __VA_ARGS__)
 #define ELPP_WRITE_LOG_IF(writer, condition, level, dispatchAction, ...) if (condition) \
-writer(level, __FILE__, __LINE__, ELPP_FUNC, dispatchAction).construct(el_getVALength(__VA_ARGS__), __VA_ARGS__)
+writer(level, el::Color::Default, __FILE__, __LINE__, ELPP_FUNC, dispatchAction).construct(el_getVALength(__VA_ARGS__), __VA_ARGS__)
 #define ELPP_WRITE_LOG_EVERY_N(writer, occasion, level, dispatchAction, ...) \
 ELPP->validateEveryNCounter(__FILE__, __LINE__, occasion) && \
-writer(level, __FILE__, __LINE__, ELPP_FUNC, dispatchAction).construct(el_getVALength(__VA_ARGS__), __VA_ARGS__)
+writer(level, el::Color::Default, __FILE__, __LINE__, ELPP_FUNC, dispatchAction).construct(el_getVALength(__VA_ARGS__), __VA_ARGS__)
 #define ELPP_WRITE_LOG_AFTER_N(writer, n, level, dispatchAction, ...) \
 ELPP->validateAfterNCounter(__FILE__, __LINE__, n) && \
-writer(level, __FILE__, __LINE__, ELPP_FUNC, dispatchAction).construct(el_getVALength(__VA_ARGS__), __VA_ARGS__)
+writer(level, el::Color::Default, __FILE__, __LINE__, ELPP_FUNC, dispatchAction).construct(el_getVALength(__VA_ARGS__), __VA_ARGS__)
 #define ELPP_WRITE_LOG_N_TIMES(writer, n, level, dispatchAction, ...) \
 ELPP->validateNTimesCounter(__FILE__, __LINE__, n) && \
-writer(level, __FILE__, __LINE__, ELPP_FUNC, dispatchAction).construct(el_getVALength(__VA_ARGS__), __VA_ARGS__)
+writer(level, el::Color::Default, __FILE__, __LINE__, ELPP_FUNC, dispatchAction).construct(el_getVALength(__VA_ARGS__), __VA_ARGS__)
 #if defined(ELPP_FEATURE_ALL) || defined(ELPP_FEATURE_PERFORMANCE_TRACKING)
 class PerformanceTrackingData {
  public:
@@ -3855,6 +3862,8 @@ class Helpers : base::StaticClass {
 /// @brief Static helpers to deal with loggers and their configurations
 class Loggers : base::StaticClass {
  public:
+  /// @brief Determines whether logging will occur at this level and category
+  static bool allowed(Level leve, const char* cat);
   /// @brief Gets existing or registers new logger
   static Logger* getLogger(const std::string& identity, bool registerIfNotAvailable = true);
   /// @brief Changes default log builder for future loggers
