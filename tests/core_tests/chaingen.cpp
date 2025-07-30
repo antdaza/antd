@@ -586,7 +586,7 @@ bool test_generator::construct_block(cryptonote::block& blk, uint64_t height, co
 
   // Nonce search...
   blk.nonce = 0;
-  while (!miner::find_nonce_for_given_block(NULL, blk, get_test_difficulty(hf_ver), height))
+  while (!miner::find_nonce_for_given_block(nullptr, blk, get_test_difficulty(), height))
     blk.timestamp++;
 
   add_block(blk, txs_weight, block_weights, already_generated_coins);
