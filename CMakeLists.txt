@@ -43,6 +43,20 @@ endif()
 cmake_minimum_required(VERSION 3.0.0)
 message(STATUS "CMake version ${CMAKE_VERSION}")
 
+set(ANTD_VERSION_MAJOR 7)
+set(ANTD_VERSION_MINOR 0)
+set(ANTD_VERSION_PATCH 0)
+set(ANTD_VERSION_TAG "release")
+
+set(ANTD_VERSION "${ANTD_VERSION_MAJOR}.${ANTD_VERSION_MINOR}.${ANTD_VERSION_PATCH}")
+set(ANTD_VERSION_FULL "${ANTD_VERSION}-${ANTD_VERSION_TAG}")
+
+configure_file(
+  ${CMAKE_SOURCE_DIR}/src/version.cpp.in
+  ${CMAKE_BINARY_DIR}/version.cpp
+  @ONLY
+)
+
 project(antd)
 
 function (die msg)
