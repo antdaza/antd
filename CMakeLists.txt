@@ -40,7 +40,7 @@ if (IOS)
     INCLUDE(CmakeLists_IOS.txt)
 endif()
 
-cmake_minimum_required(VERSION 2.8.7)
+cmake_minimum_required(VERSION 3.0.0)
 message(STATUS "CMake version ${CMAKE_VERSION}")
 
 project(antd)
@@ -307,6 +307,10 @@ endif()
 #   set(BSDI TRUE)
 
 include_directories(external/rapidjson/include external/easylogging++ src contrib/epee/include external)
+
+cmake_policy(SET CMP0054 NEW)
+set(CMAKE_SUPPRESS_DEVELOPER_WARNINGS 1 CACHE BOOL "Suppress developer warnings.")
+
 
 if(APPLE)
   include_directories(SYSTEM /usr/include/malloc)
