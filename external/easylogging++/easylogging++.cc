@@ -17,6 +17,7 @@
 #define EASYLOGGING_CC
 #include "easylogging++.h"
 
+#include <atomic>
 #include <unistd.h>
 
 #if defined(AUTO_INITIALIZE_EASYLOGGINGPP)
@@ -148,11 +149,6 @@ static el::Color colorFromLevel(el::Level level)
 
 static void setConsoleColor(el::Color color, bool bright)
 {
-  static const char *no_color_var = getenv("NO_COLOR");
-  static const bool no_color = no_color_var && *no_color_var; // apparently, NO_COLOR=0 means no color too (as per no-color.org)
-  if (no_color)
-    return;
-
 #if ELPP_OS_WINDOWS
   HANDLE h_stdout = GetStdHandle(STD_OUTPUT_HANDLE);
   switch (color)
@@ -181,10 +177,9 @@ static void setConsoleColor(el::Color color, bool bright)
   }
 #endif
 }
+
 } // namespace utils
 } // namespace base
-
-
 
 // el
 
@@ -659,19 +654,41 @@ void Configurations::unsafeSetGlobally(ConfigurationType configurationType, cons
 
 // LogBuilder
 
-void LogBuilder::convertToColoredOutput(base::type::string_t* logLine, Level level) {
+void LogBuilder::convertToColoredOutput(base::type::string_t* logLine, Level level, Color color) {
   if (!m_termSupportsColor) return;
   const base::type::char_t* resetColor = ELPP_LITERAL("\x1b[0m");
-  if (level == Level::Error || level == Level::Fatal)
-    *logLine = ELPP_LITERAL("\x1b[31m") + *logLine + resetColor;
-  else if (level == Level::Warning)
-    *logLine = ELPP_LITERAL("\x1b[33m") + *logLine + resetColor;
-  else if (level == Level::Debug)
-    *logLine = ELPP_LITERAL("\x1b[32m") + *logLine + resetColor;
-  else if (level == Level::Info)
-    *logLine = ELPP_LITERAL("\x1b[36m") + *logLine + resetColor;
-  else if (level == Level::Trace)
-    *logLine = ELPP_LITERAL("\x1b[35m") + *logLine + resetColor;
+  if (color == Color::Red)
+    *logLine = ELPP_LITERAL("\x1b[1;31m") + *logLine + resetColor;
+  else if (color == Color::Yellow)
+    *logLine = ELPP_LITERAL("\x1b[1;33m") + *logLine + resetColor;
+  else if (color == Color::Green)
+    *logLine = ELPP_LITERAL("\x1b[1;32m") + *logLine + resetColor;
+  else if (color == Color::Cyan)
+    *logLine = ELPP_LITERAL("\x1b[1;36m") + *logLine + resetColor;
+  else if (color == Color::Magenta)
+    *logLine = ELPP_LITERAL("\x1b[1;35m") + *logLine + resetColor;
+  else if (color == Color::Blue)
+    *logLine = ELPP_LITERAL("\x1b[1;34m") + *logLine + resetColor;
+  else if (color == Color::Default)
+  {
+    if (level == Level::Error || level == Level::Fatal)
+      *logLine = ELPP_LITERAL("\x1b[31m") + *logLine + resetColor;
+    else if (level == Level::Warning)
+      *logLine = ELPP_LITERAL("\x1b[33m") + *logLine + resetColor;
+    else if (level == Level::Debug)
+      *logLine = ELPP_LITERAL("\x1b[32m") + *logLine + resetColor;
+    else if (level == Level::Info)
+      *logLine = ELPP_LITERAL("\x1b[36m") + *logLine + resetColor;
+    else if (level == Level::Trace)
+      *logLine = ELPP_LITERAL("\x1b[35m") + *logLine + resetColor;
+  }
+}
+
+void LogBuilder::setColor(Color color, bool bright) {
+#if !ELPP_OS_WINDOWS
+  if (m_termSupportsColor)
+#endif
+    el::base::utils::setConsoleColor(color, bright);
 }
 
 // Logger
@@ -1227,8 +1244,7 @@ bool OS::termSupportsColor(void) {
   std::string term = getEnvironmentVariable("TERM", "");
   return term == "xterm" || term == "xterm-color" || term == "xterm-256color"
          || term == "screen" || term == "linux" || term == "cygwin"
-         || term == "tmux" || term == "tmux-256color"
-         || term == "screen-256color";
+         || term == "screen-256color" || term == "screen.xterm-256color";
 }
 
 // DateTime
@@ -2104,14 +2120,42 @@ void VRegistry::setModules(const char* modules) {
   }
 }
 
+// Log levels are sorted in a weird way...
+static int priority(Level level) {
+  if (level == Level::Fatal) return 0;
+  if (level == Level::Error) return 1;
+  if (level == Level::Warning) return 2;
+  if (level == Level::Info) return 3;
+  if (level == Level::Debug) return 4;
+  if (level == Level::Verbose) return 5;
+  if (level == Level::Trace) return 6;
+  return 7;
+}
+
+namespace
+{
+  std::atomic<int> s_lowest_priority{INT_MAX};
+}
+
+void VRegistry::clearCategories(void) {
+  const base::threading::ScopedLock scopedLock(lock());
+  m_categories.clear();
+  m_cached_allowed_categories.clear();
+  s_lowest_priority = INT_MAX;
+}
+
 void VRegistry::setCategories(const char* categories, bool clear) {
   base::threading::ScopedLock scopedLock(lock());
   auto insert = [&](std::stringstream& ss, Level level) {
     m_categories.push_back(std::make_pair(ss.str(), level));
     m_cached_allowed_categories.clear();
+    int pri = priority(level);
+    if (pri > s_lowest_priority)
+      s_lowest_priority = pri;
   };
 
   if (clear) {
+    s_lowest_priority = 0;
     m_categories.clear();
     m_cached_allowed_categories.clear();
     m_categoriesString.clear();
@@ -2168,23 +2212,14 @@ std::string VRegistry::getCategories() {
   return m_categoriesString;
 }
 
-// Log levels are sorted in a weird way...
-static int priority(Level level) {
-  if (level == Level::Fatal) return 0;
-  if (level == Level::Error) return 1;
-  if (level == Level::Warning) return 2;
-  if (level == Level::Info) return 3;
-  if (level == Level::Debug) return 4;
-  if (level == Level::Verbose) return 5;
-  if (level == Level::Trace) return 6;
-  return 7;
-}
-
 bool VRegistry::allowed(Level level, const std::string &category) {
+  return priority_allowed(priority(level), category);
+}
+bool VRegistry::priority_allowed(const int pri, const std::string &category) {
   base::threading::ScopedLock scopedLock(lock());
   const std::map<std::string, int>::const_iterator it = m_cached_allowed_categories.find(category);
   if (it != m_cached_allowed_categories.end())
-    return priority(level) <= it->second;
+    return pri <= it->second;
   if (m_categories.empty()) {
     return false;
   } else {
@@ -2193,7 +2228,7 @@ bool VRegistry::allowed(Level level, const std::string &category) {
       if (base::utils::Str::wildCardMatch(category.c_str(), it->first.c_str())) {
         const int p = priority(it->second);
         m_cached_allowed_categories.insert(std::make_pair(category, p));
-        return priority(level) <= p;
+        return pri <= p;
       }
     }
     m_cached_allowed_categories.insert(std::make_pair(category, -1));
@@ -2416,13 +2451,138 @@ void DefaultLogDispatchCallback::handle(const LogDispatchData* data) {
   m_data = data;
   base::TypedConfigurations* tc = m_data->logMessage()->logger()->typedConfigurations();
   const base::LogFormat* logFormat = &tc->logFormat(m_data->logMessage()->level());
-  dispatch(base::utils::DateTime::getDateTime(logFormat->dateTimeFormat().c_str(), &tc->subsecondPrecision(m_data->logMessage()->level()))
-      + "\t" + convertToChar(m_data->logMessage()->level()) + " " + m_data->logMessage()->message() + "\n",
-      m_data->logMessage()->logger()->logBuilder()->build(m_data->logMessage(),
-           m_data->dispatchAction() == base::DispatchAction::NormalLog || m_data->dispatchAction() == base::DispatchAction::FileOnlyLog));
+
+  const auto &logmsg = m_data->logMessage();
+  const auto msg = logmsg->message();
+  if (strchr(msg.c_str(), '\n'))
+  {
+    std::vector<std::string> v;
+    const char *s = msg.c_str();
+    while (true)
+    {
+      const char *ptr = strchr(s, '\n');
+      if (!ptr)
+      {
+        if (*s)
+          v.push_back(s);
+        break;
+      }
+      v.push_back(std::string(s, ptr - s));
+      s = ptr + 1;
+    }
+    for (const std::string &s: v)
+    {
+      LogMessage msgline(logmsg->level(), logmsg->color(), logmsg->file(), logmsg->line(), logmsg->func(), logmsg->verboseLevel(), logmsg->logger(), &s);
+      dispatch(base::utils::DateTime::getDateTime(logFormat->dateTimeFormat().c_str(), &tc->subsecondPrecision(m_data->logMessage()->level())) + "\t" + convertToChar(m_data->logMessage()->level()) + " ",
+          s + "\n",
+          m_data->logMessage()->logger()->logBuilder()->build(&msgline,
+               m_data->dispatchAction() == base::DispatchAction::NormalLog || m_data->dispatchAction() == base::DispatchAction::FileOnlyLog));
+    }
+  }
+  else
+  {
+    dispatch(base::utils::DateTime::getDateTime(logFormat->dateTimeFormat().c_str(), &tc->subsecondPrecision(m_data->logMessage()->level()))
+        + "\t" + convertToChar(m_data->logMessage()->level()) + " ", m_data->logMessage()->message() + "\n",
+        m_data->logMessage()->logger()->logBuilder()->build(m_data->logMessage(),
+             m_data->dispatchAction() == base::DispatchAction::NormalLog || m_data->dispatchAction() == base::DispatchAction::FileOnlyLog));
+  }
 }
 
-void DefaultLogDispatchCallback::dispatch(base::type::string_t&& rawLine, base::type::string_t&& logLine) {
+
+template<typename Transform>
+static inline std::string utf8canonical(const std::string &s, Transform t = [](wint_t c)->wint_t { return c; })
+{
+    std::string sc = "";
+    size_t avail = s.size();
+    const char *ptr = s.data();
+    wint_t cp = 0;
+    int bytes = 1;
+    char wbuf[8], *wptr;
+    while (avail--)
+    {
+      if ((*ptr & 0x80) == 0)
+      {
+        cp = *ptr++;
+        bytes = 1;
+      }
+      else if ((*ptr & 0xe0) == 0xc0)
+      {
+        if (avail < 1)
+          throw std::runtime_error("Invalid UTF-8");
+        cp = (*ptr++ & 0x1f) << 6;
+        cp |= *ptr++ & 0x3f;
+        --avail;
+        bytes = 2;
+      }
+      else if ((*ptr & 0xf0) == 0xe0)
+      {
+        if (avail < 2)
+          throw std::runtime_error("Invalid UTF-8");
+        cp = (*ptr++ & 0xf) << 12;
+        cp |= (*ptr++ & 0x3f) << 6;
+        cp |= *ptr++ & 0x3f;
+        avail -= 2;
+        bytes = 3;
+      }
+      else if ((*ptr & 0xf8) == 0xf0)
+      {
+        if (avail < 3)
+          throw std::runtime_error("Invalid UTF-8");
+        cp = (*ptr++ & 0x7) << 18;
+        cp |= (*ptr++ & 0x3f) << 12;
+        cp |= (*ptr++ & 0x3f) << 6;
+        cp |= *ptr++ & 0x3f;
+        avail -= 3;
+        bytes = 4;
+      }
+      else
+        throw std::runtime_error("Invalid UTF-8");
+
+      cp = t(cp);
+      if (cp <= 0x7f)
+        bytes = 1;
+      else if (cp <= 0x7ff)
+        bytes = 2;
+      else if (cp <= 0xffff)
+        bytes = 3;
+      else if (cp <= 0x10ffff)
+        bytes = 4;
+      else
+        throw std::runtime_error("Invalid code point UTF-8 transformation");
+
+      wptr = wbuf;
+      switch (bytes)
+      {
+        case 1: *wptr++ = cp; break;
+        case 2: *wptr++ = 0xc0 | (cp >> 6); *wptr++ = 0x80 | (cp & 0x3f); break;
+        case 3: *wptr++ = 0xe0 | (cp >> 12); *wptr++ = 0x80 | ((cp >> 6) & 0x3f); *wptr++ = 0x80 | (cp & 0x3f); break;
+        case 4: *wptr++ = 0xf0 | (cp >> 18); *wptr++ = 0x80 | ((cp >> 12) & 0x3f); *wptr++ = 0x80 | ((cp >> 6) & 0x3f); *wptr++ = 0x80 | (cp & 0x3f); break;
+        default: throw std::runtime_error("Invalid UTF-8");
+      }
+      *wptr = 0;
+      sc.append(wbuf, bytes);
+      cp = 0;
+      bytes = 1;
+    }
+    return sc;
+}
+
+void sanitize(std::string &s)
+{
+  s = utf8canonical(s, [](wint_t c)->wint_t {
+    if (c == 9 || c == 10 || c == 13)
+      return c;
+    if (c < 0x20)
+      return '?';
+    if (c == 0x7f)
+      return '?';
+    if (c >= 0x80 && c <= 0x9f)
+      return '?';
+    return c;
+  });
+}
+
+void DefaultLogDispatchCallback::dispatch(base::type::string_t&& rawLinePrefix, base::type::string_t&& rawLinePayload, base::type::string_t&& logLine) {
   if (m_data->dispatchAction() == base::DispatchAction::NormalLog || m_data->dispatchAction() == base::DispatchAction::FileOnlyLog) {
     if (m_data->logMessage()->logger()->m_typedConfigurations->toFile(m_data->logMessage()->level())) {
       base::type::fstream_t* fs = m_data->logMessage()->logger()->m_typedConfigurations->fileStream(
@@ -2448,9 +2608,16 @@ void DefaultLogDispatchCallback::dispatch(base::type::string_t&& rawLine, base::
     }
     if (m_data->dispatchAction() != base::DispatchAction::FileOnlyLog) {
       if (m_data->logMessage()->logger()->m_typedConfigurations->toStandardOutput(m_data->logMessage()->level())) {
-        if (ELPP->hasFlag(LoggingFlag::ColoredTerminalOutput))
-          m_data->logMessage()->logger()->logBuilder()->convertToColoredOutput(&rawLine, m_data->logMessage()->level());
-        ELPP_COUT << ELPP_COUT_LINE(rawLine);
+        const el::Level level = m_data->logMessage()->level();
+        const el::Color color = m_data->logMessage()->color();
+        m_data->logMessage()->logger()->logBuilder()->setColor(el::base::utils::colorFromLevel(level), false);
+        ELPP_COUT << rawLinePrefix;
+        m_data->logMessage()->logger()->logBuilder()->setColor(color == el::Color::Default ? el::base::utils::colorFromLevel(level): color, color != el::Color::Default);
+        try { sanitize(rawLinePayload); }
+        catch (const std::exception &e) { rawLinePayload = "<Invalid UTF-8 in log>"; }
+        ELPP_COUT << rawLinePayload;
+        m_data->logMessage()->logger()->logBuilder()->setColor(el::Color::Default, false);
+        ELPP_COUT << std::flush;
       }
     }
   }
@@ -2491,7 +2658,7 @@ void AsyncLogDispatchCallback::handle(const LogDispatchData* data) {
   if ((data->dispatchAction() == base::DispatchAction::NormalLog || data->dispatchAction() == base::DispatchAction::FileOnlyLog)
       && data->logMessage()->logger()->typedConfigurations()->toStandardOutput(data->logMessage()->level())) {
     if (ELPP->hasFlag(LoggingFlag::ColoredTerminalOutput))
-      data->logMessage()->logger()->logBuilder()->convertToColoredOutput(&logLine, data->logMessage()->level());
+      data->logMessage()->logger()->logBuilder()->convertToColoredOutput(&logLine, data->logMessage()->level(), data->logMessage()->color());
     ELPP_COUT << ELPP_COUT_LINE(logLine);
   }
   // Save resources and only queue if we want to write to file otherwise just ignore handler
@@ -2783,7 +2950,7 @@ void Writer::initializeLogger(const std::string& loggerId, bool lookup, bool nee
         ELPP->registeredLoggers()->get(std::string(base::consts::kDefaultLoggerId));
       }
     }
-    Writer(Level::Debug, m_file, m_line, m_func).construct(1, base::consts::kDefaultLoggerId)
+    Writer(Level::Debug, Color::Default, m_file, m_line, m_func).construct(1, base::consts::kDefaultLoggerId)
         << "Logger [" << loggerId << "] is not registered yet!";
     m_proceed = false;
   } else {
@@ -2814,6 +2981,16 @@ void Writer::initializeLogger(Logger *logger, bool needLock) {
 }
 
 void Writer::processDispatch() {
+  static std::atomic_flag in_dispatch;
+  if (in_dispatch.test_and_set())
+  {
+    if (m_proceed && m_logger != NULL)
+    {
+      m_logger->stream().str(ELPP_LITERAL(""));
+      m_logger->releaseLock();
+    }
+    return;
+  }
 #if ELPP_LOGGING_ENABLED
   if (ELPP->hasFlag(LoggingFlag::MultiLoggerSupport)) {
     bool firstDispatched = false;
@@ -2852,12 +3029,13 @@ void Writer::processDispatch() {
     m_logger->releaseLock();
   }
 #endif // ELPP_LOGGING_ENABLED
+  in_dispatch.clear();
 }
 
 void Writer::triggerDispatch(void) {
   if (m_proceed) {
     if (m_msg == nullptr) {
-      LogMessage msg(m_level, m_file, m_line, m_func, m_verboseLevel,
+      LogMessage msg(m_level, m_color, m_file, m_line, m_func, m_verboseLevel,
                      m_logger);
       base::LogDispatcher(m_proceed, &msg, m_dispatchAction).dispatch();
     } else {
@@ -2870,7 +3048,7 @@ void Writer::triggerDispatch(void) {
   }
   if (m_proceed && m_level == Level::Fatal
       && !ELPP->hasFlag(LoggingFlag::DisableApplicationAbortOnFatalLog)) {
-    base::Writer(Level::Warning, m_file, m_line, m_func).construct(1, base::consts::kDefaultLoggerId)
+    base::Writer(Level::Warning, Color::Default, m_file, m_line, m_func).construct(1, base::consts::kDefaultLoggerId)
         << "Aborting application. Reason: Fatal log at [" << m_file << ":" << m_line << "]";
     std::stringstream reasonStream;
     reasonStream << "Fatal log at [" << m_file << ":" << m_line << "]"
@@ -3169,6 +3347,14 @@ void Helpers::logCrashReason(int sig, bool stackTraceIfAvailable, Level level, c
 #endif // defined(ELPP_FEATURE_ALL) || defined(ELPP_FEATURE_CRASH_LOG)
 
 // Loggers
+
+bool Loggers::allowed(Level level, const char* cat)
+{
+  const int pri = base::priority(level);
+  if (pri > base::s_lowest_priority)
+    return false;
+  return ELPP->vRegistry()->priority_allowed(pri, std::string{cat});
+}
 
 Logger* Loggers::getLogger(const std::string& identity, bool registerIfNotAvailable) {
   return ELPP->registeredLoggers()->get(identity, registerIfNotAvailable);

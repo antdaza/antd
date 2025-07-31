@@ -75,6 +75,7 @@ file(COPY
   data/outputs
   data/unsigned_antd_tx
   data/signed_antd_tx
+  data/sha256sum
   DESTINATION data)
 
 add_subdirectory(core_tests)

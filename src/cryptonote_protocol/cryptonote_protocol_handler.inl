@@ -342,10 +342,29 @@ namespace cryptonote
     int64_t diff = static_cast<int64_t>(hshd.current_height) - static_cast<int64_t>(m_core.get_current_blockchain_height());
     uint64_t abs_diff = std::abs(diff);
     uint64_t max_block_height = std::max(hshd.current_height,m_core.get_current_blockchain_height());
-    MCLOG(is_inital ? el::Level::Info : el::Level::Debug, "global", context <<  "Sync data returned a new top block candidate: " << m_core.get_current_blockchain_height() << " -> " << hshd.current_height
-      << " [Your node is " << abs_diff << " blocks (" << (abs_diff / (24 * 60 * 60 / DIFFICULTY_TARGET_V2)) << " days) "
-      << (0 <= diff ? std::string("behind") : std::string("ahead"))
-      << "] " << ENDL << "SYNCHRONIZATION started");
+    uint64_t blocks_behind = abs_diff;
+    uint64_t seconds_estimate = blocks_behind * DIFFICULTY_TARGET_V2; // Estimate how many seconds behind
+
+   std::chrono::seconds duration_behind(seconds_estimate);
+    MCLOG(
+  is_inital ? el::Level::Info : el::Level::Debug,
+  "global",
+  el::Color::Yellow,
+  context
+    << "Sync data returned a new top block candidate: "
+    << m_core.get_current_blockchain_height()
+    << " -> "
+    << hshd.current_height
+    << " [Your node is "
+    << blocks_behind
+    << " blocks ("
+    << tools::get_human_readable_timespan(duration_behind)
+    << ") "
+    << (0 <= diff ? std::string("behind") : std::string("ahead"))
+    << "] "
+    << ENDL
+    << "SYNCHRONIZATION started"
+);
       if (hshd.current_height >= m_core.get_current_blockchain_height() + 5) // don't switch to unsafe mode just for a few blocks
       {
         m_core.safesyncmode(false);

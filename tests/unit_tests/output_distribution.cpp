@@ -66,6 +66,10 @@ public:
     return d;
   }
 
+  void correct_block_cumulative_difficulties(const uint64_t& /*start_height*/, const std::vector<cryptonote::difficulty_type>& /*new_cumulative_difficulties*/) override
+  {
+    // No-op for tests
+  }
   uint64_t blockchain_height;
 };
 

@@ -43,12 +43,12 @@
 #include "misc_os_dependent.h"
 #include "misc_log_ex.h"
 
-#undef SISPOP_DEFAULT_LOG_CATEGORY
-#define SISPOP_DEFAULT_LOG_CATEGORY "logging"
+#undef MONERO_DEFAULT_LOG_CATEGORY
+#define MONERO_DEFAULT_LOG_CATEGORY "logging"
 
 #define MLOG_BASE_FORMAT "%datetime{%Y-%M-%d %H:%m:%s.%g}\t%thread\t%level\t%logger\t%loc\t%msg"
 
-#define MLOG_LOG(x) CINFO(el::base::Writer,el::base::DispatchAction::FileOnlyLog,SISPOP_DEFAULT_LOG_CATEGORY) << x
+#define MLOG_LOG(x) CINFO(el::base::Writer,el::base::DispatchAction::FileOnlyLog,MONERO_DEFAULT_LOG_CATEGORY) << x
 
 using namespace epee;
 
@@ -100,7 +100,7 @@ static const char *get_default_categories(int level)
   switch (level)
   {
     case 0:
-      categories = "*:WARNING,net:FATAL,net.http:FATAL,net.ssl:FATAL,net.p2p:FATAL,net.cn:FATAL,global:INFO,verify:FATAL,serialization:FATAL,logging:INFO,msgwriter:INFO";
+      categories = "*:WARNING,net:FATAL,net.http:FATAL,net.ssl:FATAL,net.p2p:FATAL,net.cn:FATAL,daemon.rpc:FATAL,global:INFO,verify:FATAL,serialization:FATAL,daemon.rpc.payment:ERROR,stacktrace:INFO,logging:INFO,msgwriter:INFO";
       break;
     case 1:
       categories = "*:INFO,global:INFO,stacktrace:INFO,logging:INFO,msgwriter:INFO,perf.*:DEBUG";
@@ -109,7 +109,7 @@ static const char *get_default_categories(int level)
       categories = "*:DEBUG";
       break;
     case 3:
-      categories = "*:TRACE";
+      categories = "*:TRACE,*.dump:DEBUG";
       break;
     case 4:
       categories = "*:TRACE";
@@ -150,7 +150,7 @@ void mlog_configure(const std::string &filename_base, bool console, const std::s
   el::Configurations c;
   c.setGlobally(el::ConfigurationType::Filename, filename_base);
   c.setGlobally(el::ConfigurationType::ToFile, "true");
-  const char *log_format = getenv("SISPOP_LOG_FORMAT");
+  const char *log_format = getenv("MONERO_LOG_FORMAT");
   if (!log_format)
     log_format = MLOG_BASE_FORMAT;
   c.setGlobally(el::ConfigurationType::Format, log_format);
@@ -224,12 +224,12 @@ void mlog_configure(const std::string &filename_base, bool console, const std::s
     }
   });
   mlog_set_common_prefix();
-  const char *sispop_log = getenv("SISPOP_LOGS");
-  if (!sispop_log)
+  const char *monero_log = getenv("MONERO_LOGS");
+  if (!monero_log)
   {
-    sispop_log = get_default_categories(0);
+    monero_log = get_default_categories(0);
   }
-  mlog_set_log(sispop_log);
+  mlog_set_log(monero_log);
 #ifdef WIN32
   EnableVTMode();
 #endif
@@ -338,19 +338,9 @@ bool is_stdout_a_tty()
   return is_a_tty.load(std::memory_order_relaxed);
 }
 
-static bool is_nocolor()
-{
-  static const char *no_color_var = getenv("NO_COLOR");
-  static const bool no_color = no_color_var && *no_color_var; // apparently, NO_COLOR=0 means no color too (as per no-color.org)
-  return no_color;
-}
-
 void set_console_color(int color, bool bright)
 {
   if (!is_stdout_a_tty())
-    return;
-
-  if (is_nocolor())
     return;
 
   switch(color)
@@ -471,9 +461,6 @@ void reset_console_color() {
   if (!is_stdout_a_tty())
     return;
 
-  if (is_nocolor())
-    return;
-
 #ifdef WIN32
   HANDLE h_stdout = GetStdHandle(STD_OUTPUT_HANDLE);
   SetConsoleTextAttribute(h_stdout, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
@@ -511,21 +498,9 @@ static bool mlog(el::Level level, const char *category, const char *format, va_l
     return false;
   }
 
-/*  try
-  {
-     when pulling upstream epee changes change this to:
-    MCLOG(level, category, el::Color::Default, p);
-    
-    MCLOG(level, category, p);
-  }
-  catch(...)
-  {
-    ret = false;
-  }*/
-
   try
   {
-    MCLOG(level, category, p);
+    MCLOG(level, category, el::Color::Default, p);
   }
   catch(...)
   {

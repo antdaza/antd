@@ -27,6 +27,9 @@ find_library(MINIUPNP_LIBRARY miniupnpc
   HINTS $ENV{MINIUPNP_LIBRARY}
 )
 
+message(STATUS "Searching for miniupnpc.h in ${MINIUPNP_INCLUDE_DIR}")
+message(STATUS "Searching for libminiupnpc in ${MINIUPNP_LIBRARY}")
+
 find_library(MINIUPNP_STATIC_LIBRARY libminiupnpc.a
   HINTS $ENV{MINIUPNP_STATIC_LIBRARY}
 )
@@ -41,6 +44,7 @@ find_package_handle_standard_args(
   MINIUPNP_INCLUDE_DIR
   MINIUPNP_LIBRARY
 )
+
 
 IF(MINIUPNPC_FOUND)
   file(STRINGS "${MINIUPNP_INCLUDE_DIR}/miniupnpc.h" MINIUPNPC_API_VERSION_STR REGEX "^#define[\t ]+MINIUPNPC_API_VERSION[\t ]+[0-9]+")
