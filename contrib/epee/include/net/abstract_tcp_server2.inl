@@ -400,24 +400,21 @@ PRAGMA_WARNING_DISABLE_VS(4355)
   bool connection<t_protocol_handler>::call_run_once_service_io()
   {
     TRY_ENTRY();
+    auto& io_service = get_io_service(); // Use helper function instead of direct socket_.get_io_service()
     if(!m_is_multithreaded)
     {
-      //single thread model, we can wait in blocked call
-      size_t cnt = socket_.get_io_service().run_one();
-      if(!cnt)//service is going to quit
-        return false;
-    }else
-    {
-      //multi thread model, we can't(!) wait in blocked call
-      //so we make non blocking call and releasing CPU by calling sleep(0); 
-      //if no handlers were called
-      //TODO: Maybe we need to have have critical section + event + callback to upper protocol to
-      //ask it inside(!) critical region if we still able to go in event wait...
-      size_t cnt = socket_.get_io_service().poll_one();     
-      if(!cnt)
-        misc_utils::sleep_no_w(1);
+        // Single-thread model: blocking call
+        size_t cnt = io_service.run_one();
+        if(!cnt) // Service is quitting
+            return false;
     }
-    
+    else
+    {
+        // Multi-thread model: non-blocking call
+        size_t cnt = io_service.poll_one();
+        if(!cnt)
+            misc_utils::sleep_no_w(1);
+    }
     return true;
     CATCH_ENTRY_L0("connection<t_protocol_handler>::call_run_once_service_io", false);
   }
