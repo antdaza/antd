@@ -5714,18 +5714,6 @@ bool simple_wallet::locked_transfer(const std::vector<std::string> &args_)
   transfer_main(TransferLocked, args_, false);
   return true;
 }
-
-struct article_metadata {
-  bool success;
-  std::string error;
-  std::string serialized_blob;
-  std::string title;
-  std::string content;
-  std::string publisher;
-  crypto::hash content_hash;
-
-  article_metadata() : success(false), error(""), title(""), content(""), publisher(""), content_hash(crypto::null_hash) {}
-};
 //-------------------------------------------------------
 
 article_metadata set_article_to_tx_extra(const std::string& title, const std::string& content, const std::string& publisher) {

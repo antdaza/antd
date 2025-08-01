@@ -59,6 +59,58 @@ configure_file(
 
 project(antd)
 
+option (USE_CCACHE "Use ccache if a usable instance is found" ON)
+if (USE_CCACHE)
+	include(FindCcache) # Has to be included after the project() macro, to be able to read the CXX variable.
+else()
+	message(STATUS "ccache deselected")
+endif()
+option (USE_COMPILATION_TIME_PROFILER "Use compilation time profiler (for CLang >= 9 only)" OFF)
+if (USE_COMPILATION_TIME_PROFILER)
+	if (NOT "${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
+		message(FATAL_ERROR "The flag USE_COMPILATION_TIME_PROFILER is meant to be set only for CLang compiler!")
+	endif()
+	add_compile_options("-ftime-trace")
+endif()
+
+if (${CMAKE_VERSION} VERSION_GREATER "3.0.0" AND CMAKE_MAKE_PROGRAM MATCHES "ninja")
+  set(MONERO_PARALLEL_COMPILE_JOBS "" CACHE STRING "The maximum number of concurrent compilation jobs.")
+  if (MONERO_PARALLEL_COMPILE_JOBS)
+    set_property(GLOBAL APPEND PROPERTY JOB_POOLS compile_job_pool=${MONERO_PARALLEL_COMPILE_JOBS})
+    set(CMAKE_JOB_POOL_COMPILE compile_job_pool)
+  endif ()
+
+  set(MONERO_PARALLEL_LINK_JOBS "" CACHE STRING "The maximum number of concurrent link jobs.")
+  if (MONERO_PARALLEL_LINK_JOBS)
+    set_property(GLOBAL APPEND PROPERTY JOB_POOLS link_job_pool=${MONERO_PARALLEL_LINK_JOBS})
+    set(CMAKE_JOB_POOL_LINK link_job_pool)
+  endif ()
+endif ()
+  
+option (USE_CLANG_TIDY_C   "Lint the code with clang-tidy - variant C"   OFF)
+option (USE_CLANG_TIDY_CXX "Lint the code with clang-tidy - variant C++" OFF)
+if (USE_CLANG_TIDY_C AND USE_CLANG_TIDY_CXX)
+	message(FATAL_ERROR "Enabling both USE_CLANG_TIDY_C and USE_CLANG_TIDY_CXX simultaneously crashes clang-tidy.")
+endif()
+if (USE_CLANG_TIDY_C OR USE_CLANG_TIDY_CXX)
+	include(SetClangTidy)
+endif()
+if (USE_CLANG_TIDY_C)
+	monero_clang_tidy("C")
+elseif (USE_CLANG_TIDY_CXX)
+	monero_clang_tidy("CXX")
+endif()
+
+enable_language(C ASM)
+
+# Require C11/C++11 and disable extensions for all targets
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_C_EXTENSIONS OFF)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
 function (die msg)
   if (NOT WIN32)
     string(ASCII 27 Esc)
@@ -852,6 +904,9 @@ else()
 
   if(APPLE)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fvisibility=default -DGTEST_HAS_TR1_TUPLE=0")
+    if(ARM)
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-aligned-allocation")
+    endif()
   endif()
 
   set(DEBUG_FLAGS "-g3")

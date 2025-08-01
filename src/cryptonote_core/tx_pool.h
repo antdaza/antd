@@ -58,18 +58,19 @@ namespace cryptonote
   //! tuple of <deregister, transaction fee, receive time> for organization
   typedef std::pair<std::tuple<bool, double, std::time_t>, crypto::hash> tx_by_fee_and_receive_time_entry;
 
-  class txCompare
+class txCompare
+{
+public:
+  bool operator()(const tx_by_fee_and_receive_time_entry& a,
+                  const tx_by_fee_and_receive_time_entry& b) const // ← Add const here
   {
-  public:
-    bool operator()(const tx_by_fee_and_receive_time_entry& a, const tx_by_fee_and_receive_time_entry& b)
-    {
-      std::string ahash(a.second.data, sizeof(a.second.data));
-      std::string bhash(b.second.data, sizeof(b.second.data));
-      //      prioritize      deregister             fee                   arrival time      hash
-      return std::make_tuple(!std::get<0>(a.first), -std::get<1>(a.first), std::get<2>(a.first), ahash)
-           < std::make_tuple(!std::get<0>(b.first), -std::get<1>(b.first), std::get<2>(b.first), bhash);
-    }
-  };
+    std::string ahash(a.second.data, sizeof(a.second.data));
+    std::string bhash(b.second.data, sizeof(b.second.data));
+
+    return std::make_tuple(!std::get<0>(a.first), -std::get<1>(a.first), std::get<2>(a.first), ahash)
+         < std::make_tuple(!std::get<0>(b.first), -std::get<1>(b.first), std::get<2>(b.first), bhash);
+  }
+};
 
   //! container for sorting transactions by fee per unit size
   typedef std::set<tx_by_fee_and_receive_time_entry, txCompare> sorted_tx_container;

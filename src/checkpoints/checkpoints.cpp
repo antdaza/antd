@@ -160,10 +160,8 @@ if (!difficulty_str.empty())
   //---------------------------------------------------------------------------
   uint64_t checkpoints::get_max_height() const
   {
-    std::map< uint64_t, crypto::hash >::const_iterator highest = 
-        std::max_element( m_points.begin(), m_points.end(),
-                         ( boost::bind(&std::map< uint64_t, crypto::hash >::value_type::first, _1) < 
-                           boost::bind(&std::map< uint64_t, crypto::hash >::value_type::first, _2 ) ) );
+  auto highest = std::max_element(m_points.begin(), m_points.end(),
+      [](const auto& a, const auto& b) { return a.first < b.first; });
     return highest->first;
   }
   //---------------------------------------------------------------------------

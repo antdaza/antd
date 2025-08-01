@@ -750,6 +750,195 @@ void add_data_to_tx_extra(std::vector<uint8_t>& tx_extra, const std::string& dat
     return result;
   }
   //---------------------------------------------------------------
+  article_metadata set_calculator_to_tx_extra(const std::string& operation, double op1, double op2) {
+  article_metadata result;
+  calculator_metadata calc_data;
+  calc_data.operation = operation;
+  calc_data.operand1 = op1;
+  calc_data.operand2 = op2;
+
+  // Compute result
+  if (operation == "ADD") {
+    calc_data.result = op1 + op2;
+  } else if (operation == "SUB") {
+    calc_data.result = op1 - op2;
+  } else if (operation == "MUL") {
+    calc_data.result = op1 * op2;
+  } else if (operation == "DIV") {
+    if (op2 == 0) {
+      result.error = "Division by zero";
+      return result;
+    }
+    calc_data.result = op1 / op2;
+  } else {
+    result.error = "Unsupported operation: " + operation;
+    return result;
+  }
+
+  // Serialize as: "CALC<op_len><op><op1><op2><result>"
+  std::vector<uint8_t> serialized;
+  serialized.push_back(static_cast<uint8_t>(calc_data.operation.size()));
+  serialized.insert(serialized.end(), calc_data.operation.begin(), calc_data.operation.end());
+
+  auto append_double = [&](double d) {
+    uint8_t* p = reinterpret_cast<uint8_t*>(&d);
+    serialized.insert(serialized.end(), p, p + sizeof(double));
+  };
+
+  append_double(calc_data.operand1);
+  append_double(calc_data.operand2);
+  append_double(calc_data.result);
+
+  result.serialized_blob = std::string("CALC") + std::string(serialized.begin(), serialized.end());
+  result.success = true;
+  result.calc = calc_data;
+
+  return result;
+  }
+  //---------------------------------------------------------------
+  bool parse_calculator_metadata(const std::string& extra_nonce, article_metadata& result) {
+  if (extra_nonce.size() < 4 || extra_nonce.substr(0, 4) != "CALC") {
+    result.error = "Not calculator metadata";
+    return false;
+  }
+
+  size_t pos = 4;
+  const uint8_t* data = reinterpret_cast<const uint8_t*>(extra_nonce.data());
+  size_t size = extra_nonce.size();
+
+  // Parse operation
+  if (pos + 1 > size) return false;
+  uint8_t op_len = data[pos++];
+  if (pos + op_len > size) return false;
+  std::string operation(reinterpret_cast<const char*>(data + pos), op_len);
+  pos += op_len;
+
+  auto read_double = [&](double& out) -> bool {
+    if (pos + sizeof(double) > size) return false;
+    std::memcpy(&out, data + pos, sizeof(double));
+    pos += sizeof(double);
+    return true;
+  };
+
+  calculator_metadata calc;
+  calc.operation = operation;
+
+  if (!read_double(calc.operand1)) return false;
+  if (!read_double(calc.operand2)) return false;
+  if (!read_double(calc.result)) return false;
+
+  result.calc = calc;
+  result.success = true;
+  return true;
+  }
+  //---------------------------------------------------------------
+  article_metadata set_ballot_to_tx_extra(
+    const std::string& operation,
+    const std::string& ballot_id,
+    const std::string& title_or_option,
+    const std::string& voter_id
+  ) {
+  article_metadata result;
+  ballot_metadata ballot;
+
+  if (operation != "CREATE" && operation != "VOTE") {
+    result.error = "Invalid ballot operation: " + operation;
+    return result;
+  }
+
+  ballot.operation = operation;
+  ballot.ballot_id = ballot_id;
+  ballot.timestamp = std::time(nullptr);
+  ballot.voter_id = voter_id;
+
+  if (operation == "CREATE") {
+    ballot.title = title_or_option;
+  } else if (operation == "VOTE") {
+    ballot.selected_option = title_or_option;
+  }
+
+  // Serialize as: "BALC<op_len><op><ballot_id_len><ballot_id><...>"
+  std::vector<uint8_t> data;
+  data.push_back(static_cast<uint8_t>(operation.size()));
+  data.insert(data.end(), operation.begin(), operation.end());
+
+  data.push_back(static_cast<uint8_t>(ballot_id.size()));
+  data.insert(data.end(), ballot_id.begin(), ballot_id.end());
+
+  if (operation == "CREATE") {
+    data.push_back(static_cast<uint8_t>(ballot.title.size()));
+    data.insert(data.end(), ballot.title.begin(), ballot.title.end());
+  } else {
+    data.push_back(static_cast<uint8_t>(ballot.selected_option.size()));
+    data.insert(data.end(), ballot.selected_option.begin(), ballot.selected_option.end());
+
+    data.push_back(static_cast<uint8_t>(voter_id.size()));
+    data.insert(data.end(), voter_id.begin(), voter_id.end());
+  }
+
+  // Timestamp (8 bytes)
+  uint64_t ts = ballot.timestamp;
+  for (int i = 0; i < 8; i++)
+    data.push_back((ts >> (i * 8)) & 0xFF);
+
+  result.serialized_blob = std::string("BALC") + std::string(data.begin(), data.end());
+  result.success = true;
+  result.ballot = ballot;
+
+  return result;
+  }
+  //---------------------------------------------------------------
+  bool parse_ballot_metadata(const std::string& extra_nonce, article_metadata& result) {
+  if (extra_nonce.size() < 4 || extra_nonce.substr(0, 4) != "BALC") {
+    result.error = "Not ballot metadata";
+    return false;
+  }
+
+  size_t pos = 4;
+  const uint8_t* data = reinterpret_cast<const uint8_t*>(extra_nonce.data());
+  size_t size = extra_nonce.size();
+
+  ballot_metadata ballot;
+
+  auto read_string = [&](std::string& out) -> bool {
+    if (pos + 1 > size) return false;
+    uint8_t len = data[pos++];
+    if (pos + len > size) return false;
+    out = std::string(data + pos, data + pos + len);
+    pos += len;
+    return true;
+  };
+
+  if (!read_string(ballot.operation)) return false;
+  if (!read_string(ballot.ballot_id)) return false;
+
+  if (ballot.operation == "CREATE") {
+    if (!read_string(ballot.title)) return false;
+  } else if (ballot.operation == "VOTE") {
+    if (!read_string(ballot.selected_option)) return false;
+    if (!read_string(ballot.voter_id)) return false;
+  } else {
+    result.error = "Unknown ballot operation: " + ballot.operation;
+    return false;
+  }
+
+  if (pos + 8 > size) {
+    result.error = "Missing timestamp";
+    return false;
+  }
+
+  uint64_t timestamp = 0;
+  for (int i = 0; i < 8; i++) {
+    timestamp |= static_cast<uint64_t>(data[pos++]) << (i * 8);
+  }
+
+  ballot.timestamp = timestamp;
+  result.ballot = ballot;
+  result.success = true;
+
+  return true;
+  }
+  //---------------------------------------------------------------
   bool add_tx_key_image_proofs_to_tx_extra(std::vector<uint8_t>& tx_extra, const tx_extra_tx_key_image_proofs& proofs)
   {
     tx_extra_field field = proofs;
