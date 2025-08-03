@@ -238,7 +238,7 @@ bool nodetool::node_server<t_payload_net_handler>::connect_to_peer(const epee::n
     const auto &ipv4 = addr.as<epee::net_utils::ipv4_network_address>();
     host = ipv4.host_str();
     port_num = ipv4.port();
-    bind_ip = "45.87.80.81";
+    bind_ip = "0.0.0.0";
   }
   else if (addr.get_type_id() == epee::net_utils::ipv6_network_address::ID)
   {
@@ -247,14 +247,7 @@ bool nodetool::node_server<t_payload_net_handler>::connect_to_peer(const epee::n
     port_num = ipv6.port();
     bind_ip = "::";
   }
- 
 
-  //Only allow your IP and port
-  if (!(host == "129.151.164.223" && host == "45.87.80.81" && port_num == 14040))
-  {
-    MINFO("Skipping connection to non-whitelisted peer " << host << ":" << port_num);
-    return false;
-  }
 
   std::string port = std::to_string(port_num);
   const uint32_t timeout_ms = 5000;
@@ -326,7 +319,7 @@ bool node_server<t_payload_net_handler>::block_host(const epee::net_utils::netwo
       auto it = m_host_fails_score.find(address.host_str());
       CHECK_AND_ASSERT_MES(it != m_host_fails_score.end(), false, "internal error");
       it->second = P2P_IP_FAILS_BEFORE_BLOCK/2;
-      block_host(address);
+      //block_host(address);
     }
     return true;
   }
@@ -889,18 +882,11 @@ bool node_server<t_payload_net_handler>::block_host(const epee::net_utils::netwo
       ev.wait();
     }
 
-    if(!hsh_result)
-    {
-      LOG_WARNING_CC(context_, "COMMAND_HANDSHAKE Failed");
-      m_net_server.get_config_object().close(context_.m_connection_id);
-    }
-    else
-    {
+
       try_get_support_flags(context_, [](p2p_connection_context& flags_context, const uint32_t& support_flags) 
       {
         flags_context.support_flags = support_flags;
       });
-    }
 
     return hsh_result;
   }

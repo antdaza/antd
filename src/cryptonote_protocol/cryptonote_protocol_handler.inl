@@ -280,7 +280,7 @@ namespace cryptonote
 
     return connections;
   }
-  //---------------------------------------
+  //------------------------------------------------------------------------------------------------------------------------
   template<class t_core>
   bool t_cryptonote_protocol_handler<t_core>::process_payload_sync_data(const CORE_SYNC_DATA& hshd, cryptonote_connection_context& context, bool is_inital)
   {
@@ -304,7 +304,23 @@ namespace cryptonote
       }
     }
 
+    // reject weird pruning schemes
+    if (hshd.pruning_seed)
+    {
+      const uint32_t log_stripes = tools::get_pruning_log_stripes(hshd.pruning_seed);
+      if (log_stripes != CRYPTONOTE_PRUNING_LOG_STRIPES || tools::get_pruning_stripe(hshd.pruning_seed) > (1u << log_stripes))
+      {
+        MWARNING(context << " peer claim unexpected pruning seed " << epee::string_tools::to_string_hex(hshd.pruning_seed) << ", disconnecting");
+        return false;
+      }
+    }
+
     context.m_remote_blockchain_height = hshd.current_height;
+    context.m_pruning_seed = hshd.pruning_seed;
+#ifdef CRYPTONOTE_PRUNING_DEBUG_SPOOF_SEED
+    context.m_pruning_seed = tools::make_pruning_seed(1 + (context.m_remote_address.as<epee::net_utils::ipv4_network_address>().ip()) % (1 << CRYPTONOTE_PRUNING_LOG_STRIPES), CRYPTONOTE_PRUNING_LOG_STRIPES);
+    LOG_INFO_CC(context, "New connection posing as pruning seed " << epee::string_tools::to_string_hex(context.m_pruning_seed) << ", seed address " << &context.m_pruning_seed);
+#endif
 
     uint64_t target = m_core.get_target_blockchain_height();
     if (target == 0)
@@ -323,23 +339,39 @@ namespace cryptonote
     /* As I don't know if accessing hshd from core could be a good practice,
     I prefer pushing target height to the core at the same time it is pushed to the user.
     Nz. */
-    m_core.set_target_blockchain_height((hshd.current_height));
     int64_t diff = static_cast<int64_t>(hshd.current_height) - static_cast<int64_t>(m_core.get_current_blockchain_height());
     uint64_t abs_diff = std::abs(diff);
     uint64_t max_block_height = std::max(hshd.current_height,m_core.get_current_blockchain_height());
-    MCLOG(is_inital ? el::Level::Info : el::Level::Debug, "global",el::Color::Yellow, context <<  "Sync data returned a new top block candidate: " << m_core.get_current_blockchain_height() << " -> " << hshd.current_height
+    MCLOG(is_inital ? el::Level::Info : el::Level::Debug, "global", el::Color::Yellow, context <<  "Sync data returned a new top block candidate: " << m_core.get_current_blockchain_height() << " -> " << hshd.current_height
       << " [Your node is " << abs_diff << " blocks (" << (abs_diff / (24 * 60 * 60 / DIFFICULTY_TARGET_V2)) << " days) "
       << (0 <= diff ? std::string("behind") : std::string("ahead"))
       << "] " << ENDL << "SYNCHRONIZATION started");
       if (hshd.current_height >= m_core.get_current_blockchain_height() + 5) // don't switch to unsafe mode just for a few blocks
+      {
         m_core.safesyncmode(false);
+      }
+      if (m_core.get_target_blockchain_height() == 0) // only when sync starts
+      {
+        m_sync_timer.resume();
+        m_sync_timer.reset();
+        m_add_timer.pause();
+        m_add_timer.reset();
+        m_last_add_end_time = 0;
+        m_sync_spans_downloaded = 0;
+        m_sync_old_spans_downloaded = 0;
+        m_sync_bad_spans_downloaded = 0;
+        m_sync_download_chain_size = 0;
+        m_sync_download_objects_size = 0;
+      }
+    m_core.set_target_blockchain_height((hshd.current_height));
     }
-    LOG_PRINT_L1("Remote blockchain height: " << hshd.current_height << ", id: " << hshd.top_id);
+    MINFO(context << "Remote blockchain height: " << hshd.current_height << ", id: " << hshd.top_id);
     context.m_state = cryptonote_connection_context::state_synchronizing;
     //let the socket to send response to handshake, but request callback, to let send request data after response
     LOG_PRINT_CCONTEXT_L2("requesting callback");
     ++context.m_callback_request_count;
     m_p2p->request_callback(context);
+    MLOG_PEER_STATE("requesting callback");
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------
@@ -384,26 +416,14 @@ namespace cryptonote
     {
       cryptonote::tx_verification_context tvc = AUTO_VAL_INIT(tvc);
       m_core.handle_incoming_tx(*tx_blob_it, tvc, true, true, false);
-if(tvc.m_verifivation_failed)
-{
- 
-  uint16_t port = 0;
-std::string ip = context.m_remote_address.host_str();
-
-if (context.m_remote_address.get_type_id() == epee::net_utils::ipv4_network_address::ID)
-{
-  const auto& ipv4 = context.m_remote_address.as<epee::net_utils::ipv4_network_address>();
-  port = ipv4.port();
-}
-else if (context.m_remote_address.get_type_id() == epee::net_utils::ipv6_network_address::ID)
-{
-  const auto& ipv6 = context.m_remote_address.as<epee::net_utils::ipv6_network_address>();
-  port = ipv6.port();
-}
-
-
-}
-
+      if(tvc.m_verifivation_failed)
+      {
+        LOG_PRINT_CCONTEXT_L1("Block verification failed: transaction verification failed, dropping connection");
+        drop_connection(context, false, false);
+        m_core.cleanup_handle_incoming_blocks();
+        m_core.resume_mine();
+        return 1;
+      }
     }
 
     block_verification_context bvc = boost::value_initialized<block_verification_context>();
@@ -2306,4 +2326,3 @@ skip:
     m_core.stop();
   }
 } // namespace
-
