@@ -37,18 +37,21 @@ enum portable_binary_archive_flags {
 //#error archive flags conflict
 //#endif
 
-inline void
-reverse_bytes(signed char size, char *address){
-    if (size <= 0)
-        throw archive_exception(archive_exception::other_exception);
-    char * first = address;
-    char * last = first + size - 1;
-    for(;first < last;++first, --last){
-        char x = *last;
-        *last = *first;
-        *first = x;
+inline void reverse_bytes(std::size_t size, char* address) {
+    if (size == 0 || address == nullptr)
+        throw boost::archive::archive_exception(boost::archive::archive_exception::other_exception);
+
+    char* first = address;
+    char* last = first + size - 1;
+    while (first < last) {
+        char tmp = *first;
+        *first = *last;
+        *last = tmp;
+        ++first;
+        --last;
     }
 }
+
 
 } }
 

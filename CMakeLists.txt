@@ -59,6 +59,8 @@ configure_file(
 
 project(antd)
 
+add_compile_options(-Wno-inline)
+
 option (USE_CCACHE "Use ccache if a usable instance is found" ON)
 if (USE_CCACHE)
 	include(FindCcache) # Has to be included after the project() macro, to be able to read the CXX variable.

@@ -121,7 +121,7 @@ namespace cryptonote
 
    BEGIN_SERIALIZE()
      FIELD(nonce)
-     if(TX_EXTRA_NONCE_MAX_COUNT < nonce.size()) return false;
+//     if(TX_EXTRA_NONCE_MAX_COUNT < nonce.size()) return false;
    END_SERIALIZE()
   };
 

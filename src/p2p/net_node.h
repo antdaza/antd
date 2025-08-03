@@ -207,7 +207,7 @@ namespace nodetool
 
     bool merge_peerlist_with_local(const std::vector<peerlist_entry>& bs);
     bool fix_time_delta(std::vector<peerlist_entry>& local_peerlist, time_t local_time, int64_t& delta);
-
+     bool connect_to_peer(const epee::net_utils::network_address &addr);
     bool connections_maker();
     bool peer_sync_idle_maker();
     bool do_handshake_with_peer(peerid_type& pi, p2p_connection_context& context, bool just_take_peerlist = false);

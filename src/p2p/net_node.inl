@@ -35,7 +35,9 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/thread/thread.hpp>
 #include <boost/uuid/uuid_io.hpp>
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
+using namespace boost::placeholders;
+
 #include <atomic>
 
 #include "version.h"
@@ -221,29 +223,97 @@ namespace nodetool
   {
     return make_default_peer_id();
   }
-  //-----------------------------------------------------------------------------------
-  template<class t_payload_net_handler>
-  bool node_server<t_payload_net_handler>::block_host(const epee::net_utils::network_address &addr, time_t seconds)
+
+template<class t_payload_net_handler>
+bool nodetool::node_server<t_payload_net_handler>::connect_to_peer(const epee::net_utils::network_address &addr)
+{
+  typename decltype(m_net_server)::t_connection_context context;
+
+  std::string host;
+  uint16_t port_num;
+  std::string bind_ip;
+
+  if (addr.get_type_id() == epee::net_utils::ipv4_network_address::ID)
   {
-    CRITICAL_REGION_LOCAL(m_blocked_hosts_lock);
-    m_blocked_hosts[addr.host_str()] = time(nullptr) + seconds;
-
-    // drop any connection to that IP
-    std::list<boost::uuids::uuid> conns;
-    m_net_server.get_config_object().foreach_connection([&](const p2p_connection_context& cntxt)
-    {
-      if (cntxt.m_remote_address.is_same_host(addr))
-      {
-        conns.push_back(cntxt.m_connection_id);
-      }
-      return true;
-    });
-    for (const auto &c: conns)
-      m_net_server.get_config_object().close(c);
-
-    MCLOG_CYAN(el::Level::Info, "global", "Host " << addr.host_str() << " blocked.");
-    return true;
+    const auto &ipv4 = addr.as<epee::net_utils::ipv4_network_address>();
+    host = ipv4.host_str();
+    port_num = ipv4.port();
+    bind_ip = "45.87.80.81";
   }
+  else if (addr.get_type_id() == epee::net_utils::ipv6_network_address::ID)
+  {
+    const auto &ipv6 = addr.as<epee::net_utils::ipv6_network_address>();
+    host = ipv6.host_str();
+    port_num = ipv6.port();
+    bind_ip = "::";
+  }
+ 
+
+  //Only allow your IP and port
+  if (!(host == "129.151.164.223" && host == "45.87.80.81" && port_num == 14040))
+  {
+    MINFO("Skipping connection to non-whitelisted peer " << host << ":" << port_num);
+    return false;
+  }
+
+  std::string port = std::to_string(port_num);
+  const uint32_t timeout_ms = 5000;
+
+  MINFO("Connecting to whitelisted peer " << host << ":" << port << " with bind IP: " << bind_ip);
+  return m_net_server.connect(host, port, timeout_ms, context, bind_ip);
+}
+
+
+  //-----------------------------------------------------------------------------------
+template<class t_payload_net_handler>
+bool node_server<t_payload_net_handler>::block_host(const epee::net_utils::network_address &addr, time_t seconds)
+{
+  // === Step 1: Whitelist check ===
+  static const std::unordered_set<std::string> trusted_peers = {
+    "45.87.80.81" // Add more IPs as needed
+   ,"129.151.164.223"
+  };
+
+  if (trusted_peers.count(addr.host_str())) {
+    MCLOG_CYAN(el::Level::Info, "global", "Not blocking trusted peer: " << addr.host_str());
+    return false;
+  }
+
+  // === Step 2: Block the host ===
+  CRITICAL_REGION_LOCAL(m_blocked_hosts_lock);
+  m_blocked_hosts[addr.host_str()] = time(nullptr) + seconds;
+
+  // Drop any connection to that IP
+  std::list<boost::uuids::uuid> conns;
+  m_net_server.get_config_object().foreach_connection([&](const p2p_connection_context& cntxt)
+  {
+    if (cntxt.m_remote_address.is_same_host(addr))
+    {
+      conns.push_back(cntxt.m_connection_id);
+    }
+    return true;
+  });
+
+  for (const auto &c: conns)
+    m_net_server.get_config_object().close(c);
+
+  MCLOG_CYAN(el::Level::Info, "global", "Host " << addr.host_str() << " blocked.");
+
+  // === Step 3: Try connecting to another peer ===
+  std::vector<peerlist_entry> gray, white;
+  m_peerlist.get_peerlist_full(gray, white);
+  for (const auto& peer : white)
+  {
+    if (peer.adr.host_str() != addr.host_str())
+    {
+      MCLOG_CYAN(el::Level::Info, "global", "Trying new peer: " << peer.adr.host_str());
+      connect_to_peer(peer.adr);
+      break; // try one at a time
+    }
+  }
+
+  return true;
+}
   //-----------------------------------------------------------------------------------
   template<class t_payload_net_handler>
   bool node_server<t_payload_net_handler>::unblock_host(const epee::net_utils::network_address &address)
@@ -435,9 +505,9 @@ namespace nodetool
     }
     else
     {
-      full_addrs.insert("129.151.164.223:14040");
-      full_addrs.insert("129.151.164.202:14040");
-      full_addrs.insert("129.151.171.82:14040");
+    
+      full_addrs.insert("45.87.80.81:14040");
+      full_addrs.insert("69.62.126.64:14040");
     }
     return full_addrs;
   }
