@@ -102,7 +102,8 @@ Blockchain::Blockchain(tx_memory_pool& tx_pool, full_nodes::full_node_list& full
   m_full_node_list(full_node_list),
   m_deregister_vote_pool(deregister_vote_pool),
   m_btc_valid(false),
-  m_prepare_height(0)
+  m_prepare_height(0),
+  m_batch_success(true)
 {
   LOG_PRINT_L3("Blockchain::" << __func__);
 }
@@ -4420,6 +4421,347 @@ bool Blockchain::calc_batched_control_reward(uint64_t height, uint64_t &reward) 
     cryptonote::block const &block = it.second;
     if (block.major_version >= network_version_10_bulletproofs)
       reward += derive_control_from_block_reward(nettype(), block);
+  }
+
+  return true;
+}
+
+bool Blockchain::prepare_handle_incoming_blocks(const std::vector<block_complete_entry> &blocks_entry, std::vector<block> &blocks)
+{
+  MTRACE("Blockchain::" << __func__);
+  TIME_MEASURE_START(prepare);
+  bool stop_batch;
+  uint64_t bytes = 0;
+  size_t total_txs = 0;
+  blocks.clear();
+
+  // Order of locking must be:
+  //  m_incoming_tx_lock (optional)
+  //  m_tx_pool lock
+  //  blockchain lock
+  //
+  //  Something which takes the blockchain lock may never take the txpool lock
+  //  if it has not provably taken the txpool lock earlier
+  //
+  //  The txpool lock is now taken in prepare_handle_incoming_blocks
+  //  and released in cleanup_handle_incoming_blocks. This avoids issues
+  //  when something uses the pool, which now uses the blockchain and
+  //  needs a batch, since a batch could otherwise be active while the
+  //  txpool and blockchain locks were not held
+
+  m_tx_pool.lock();
+  CRITICAL_REGION_LOCAL1(m_blockchain_lock);
+
+  if(blocks_entry.size() == 0)
+    return false;
+
+  for (const auto &entry : blocks_entry)
+  {
+    bytes += entry.block.size();
+    for (const auto &tx_blob : entry.txs)
+    {
+      bytes += tx_blob.size();
+    }
+    total_txs += entry.txs.size();
+  }
+  m_bytes_to_sync += bytes;
+  while (!(stop_batch = m_db->batch_start(blocks_entry.size(), bytes))) {
+    m_blockchain_lock.unlock();
+    m_tx_pool.unlock();
+    epee::misc_utils::sleep_no_w(1000);
+    m_tx_pool.lock();
+    m_blockchain_lock.lock();
+  }
+  m_batch_success = true;
+
+  const uint64_t height = m_db->height();
+  if ((height + blocks_entry.size()) < m_blocks_hash_check.size())
+    return true;
+
+  bool blocks_exist = false;
+  tools::threadpool& tpool = tools::threadpool::getInstance();
+  unsigned threads = tpool.get_max_concurrency();
+  blocks.resize(blocks_entry.size());
+
+  if (1)
+  {
+    // limit threads, default limit = 4
+    if(threads > m_max_prepare_blocks_threads)
+      threads = m_max_prepare_blocks_threads;
+
+    unsigned int batches = blocks_entry.size() / threads;
+    unsigned int extra = blocks_entry.size() % threads;
+    MDEBUG("block_batches: " << batches);
+    std::vector<std::unordered_map<crypto::hash, crypto::hash>> maps(threads);
+    auto it = blocks_entry.begin();
+    unsigned blockidx = 0;
+
+    const crypto::hash tophash = m_db->top_block_hash();
+    for (unsigned i = 0; i < threads; i++)
+    {
+      for (unsigned int j = 0; j < batches; j++, ++blockidx)
+      {
+        block &block = blocks[blockidx];
+        crypto::hash block_hash;
+
+        if (!parse_and_validate_block_from_blob(it->block, block, block_hash))
+          return false;
+
+        // check first block and skip all blocks if its not chained properly
+        if (blockidx == 0)
+        {
+          if (block.prev_id != tophash)
+          {
+            MDEBUG("Skipping prepare blocks. New blocks don't belong to chain.");
+            blocks.clear();
+            return true;
+          }
+        }
+        if (have_block(block_hash))
+          blocks_exist = true;
+
+        std::advance(it, 1);
+      }
+    }
+
+    for (unsigned i = 0; i < extra && !blocks_exist; i++, blockidx++)
+    {
+      block &block = blocks[blockidx];
+      crypto::hash block_hash;
+
+      if (!parse_and_validate_block_from_blob(it->block, block, block_hash))
+        return false;
+
+      if (have_block(block_hash))
+        blocks_exist = true;
+
+      std::advance(it, 1);
+    }
+
+    if (!blocks_exist)
+    {
+      m_blocks_longhash_table.clear();
+      uint64_t thread_height = height;
+      tools::threadpool::waiter waiter;
+      for (unsigned int i = 0; i < threads; i++)
+      {
+        unsigned nblocks = batches;
+        if (i < extra)
+          ++nblocks;
+        tpool.submit(&waiter, boost::bind(&Blockchain::block_longhash_worker, this, thread_height, epee::span<const block>(&blocks[thread_height - height], nblocks), std::ref(maps[i])), true);
+        thread_height += nblocks;
+      }
+
+      waiter.wait(&tpool);
+
+      if (m_cancel)
+         return false;
+
+      for (const auto & map : maps)
+      {
+        m_blocks_longhash_table.insert(map.begin(), map.end());
+      }
+    }
+  }
+
+  if (m_cancel)
+    return false;
+
+  if (blocks_exist)
+  {
+    MDEBUG("Skipping remainder of prepare blocks. Blocks exist.");
+    return true;
+  }
+
+  m_fake_scan_time = 0;
+  m_fake_pow_calc_time = 0;
+
+  m_scan_table.clear();
+  m_check_txin_table.clear();
+
+  TIME_MEASURE_FINISH(prepare);
+  m_fake_pow_calc_time = prepare / blocks_entry.size();
+
+  if (blocks_entry.size() > 1 && threads > 1 && m_show_time_stats)
+    MDEBUG("Prepare blocks took: " << prepare << " ms");
+
+  TIME_MEASURE_START(scantable);
+
+  // [input] stores all unique amounts found
+  std::vector < uint64_t > amounts;
+  // [input] stores all absolute_offsets for each amount
+  std::map<uint64_t, std::vector<uint64_t>> offset_map;
+  // [output] stores all output_data_t for each absolute_offset
+  std::map<uint64_t, std::vector<output_data_t>> tx_map;
+  std::vector<std::pair<cryptonote::transaction, crypto::hash>> txes(total_txs);
+
+#define SCAN_TABLE_QUIT(m) \
+        do { \
+            MERROR_VER(m) ;\
+            m_scan_table.clear(); \
+            return false; \
+        } while(0); \
+
+  // generate sorted tables for all amounts and absolute offsets
+  size_t tx_index = 0, block_index = 0;
+  for (const auto &entry : blocks_entry)
+  {
+    if (m_cancel)
+      return false;
+
+    for (const auto &tx_blob : entry.txs)
+    {
+      if (tx_index >= txes.size())
+        SCAN_TABLE_QUIT("tx_index is out of sync");
+      transaction &tx = txes[tx_index].first;
+      crypto::hash &tx_prefix_hash = txes[tx_index].second;
+      ++tx_index;
+
+      if (!parse_and_validate_tx_base_from_blob(tx_blob, tx))
+        SCAN_TABLE_QUIT("Could not parse tx from incoming blocks.");
+      cryptonote::get_transaction_prefix_hash(tx, tx_prefix_hash);
+
+      auto its = m_scan_table.find(tx_prefix_hash);
+      if (its != m_scan_table.end())
+        SCAN_TABLE_QUIT("Duplicate tx found from incoming blocks.");
+
+      m_scan_table.emplace(tx_prefix_hash, std::unordered_map<crypto::key_image, std::vector<output_data_t>>());
+      its = m_scan_table.find(tx_prefix_hash);
+      assert(its != m_scan_table.end());
+
+      // get all amounts from tx.vin(s)
+      for (const auto &txin : tx.vin)
+      {
+        const txin_to_key &in_to_key = boost::get < txin_to_key > (txin);
+
+        // check for duplicate
+        auto it = its->second.find(in_to_key.k_image);
+        if (it != its->second.end())
+          SCAN_TABLE_QUIT("Duplicate key_image found from incoming blocks.");
+
+        amounts.push_back(in_to_key.amount);
+      }
+
+      // sort and remove duplicate amounts from amounts list
+      std::sort(amounts.begin(), amounts.end());
+      auto last = std::unique(amounts.begin(), amounts.end());
+      amounts.erase(last, amounts.end());
+
+      // add amount to the offset_map and tx_map
+      for (const uint64_t &amount : amounts)
+      {
+        if (offset_map.find(amount) == offset_map.end())
+          offset_map.emplace(amount, std::vector<uint64_t>());
+
+        if (tx_map.find(amount) == tx_map.end())
+          tx_map.emplace(amount, std::vector<output_data_t>());
+      }
+
+      // add new absolute_offsets to offset_map
+      for (const auto &txin : tx.vin)
+      {
+        const txin_to_key &in_to_key = boost::get < txin_to_key > (txin);
+        // no need to check for duplicate here.
+        auto absolute_offsets = relative_output_offsets_to_absolute(in_to_key.key_offsets);
+        for (const auto & offset : absolute_offsets)
+          offset_map[in_to_key.amount].push_back(offset);
+
+      }
+    }
+    ++block_index;
+  }
+
+  // sort and remove duplicate absolute_offsets in offset_map
+  for (auto &offsets : offset_map)
+  {
+    std::sort(offsets.second.begin(), offsets.second.end());
+    auto last = std::unique(offsets.second.begin(), offsets.second.end());
+    offsets.second.erase(last, offsets.second.end());
+  }
+
+  // gather all the output keys
+  threads = tpool.get_max_concurrency();
+  if (!m_db->can_thread_bulk_indices())
+    threads = 1;
+
+  if (threads > 1 && amounts.size() > 1)
+  {
+    tools::threadpool::waiter waiter;
+
+    for (size_t i = 0; i < amounts.size(); i++)
+    {
+      uint64_t amount = amounts[i];
+      tpool.submit(&waiter, boost::bind(&Blockchain::output_scan_worker, this, amount, std::cref(offset_map[amount]), std::ref(tx_map[amount])), true);
+    }
+    waiter.wait(&tpool);
+  }
+  else
+  {
+    for (size_t i = 0; i < amounts.size(); i++)
+    {
+      uint64_t amount = amounts[i];
+      output_scan_worker(amount, offset_map[amount], tx_map[amount]);
+    }
+  }
+
+  // now generate a table for each tx_prefix and k_image hashes
+  tx_index = 0;
+  for (const auto &entry : blocks_entry)
+  {
+    if (m_cancel)
+      return false;
+
+    for (const auto &tx_blob : entry.txs)
+    {
+      if (tx_index >= txes.size())
+        SCAN_TABLE_QUIT("tx_index is out of sync");
+      const transaction &tx = txes[tx_index].first;
+      const crypto::hash &tx_prefix_hash = txes[tx_index].second;
+      ++tx_index;
+
+      auto its = m_scan_table.find(tx_prefix_hash);
+      if (its == m_scan_table.end())
+        SCAN_TABLE_QUIT("Tx not found on scan table from incoming blocks.");
+
+      for (const auto &txin : tx.vin)
+      {
+        const txin_to_key &in_to_key = boost::get < txin_to_key > (txin);
+        auto needed_offsets = relative_output_offsets_to_absolute(in_to_key.key_offsets);
+
+        std::vector<output_data_t> outputs;
+        for (const uint64_t & offset_needed : needed_offsets)
+        {
+          size_t pos = 0;
+          bool found = false;
+
+          for (const uint64_t &offset_found : offset_map[in_to_key.amount])
+          {
+            if (offset_needed == offset_found)
+            {
+              found = true;
+              break;
+            }
+
+            ++pos;
+          }
+
+          if (found && pos < tx_map[in_to_key.amount].size())
+            outputs.push_back(tx_map[in_to_key.amount].at(pos));
+          else
+            break;
+        }
+
+        its->second.emplace(in_to_key.k_image, outputs);
+      }
+    }
+  }
+
+  TIME_MEASURE_FINISH(scantable);
+  if (total_txs > 0)
+  {
+    m_fake_scan_time = scantable / total_txs;
+    if(m_show_time_stats)
+      MDEBUG("Prepare scantable took: " << scantable << " ms");
   }
 
   return true;

@@ -271,6 +271,7 @@ namespace cryptonote
      *
      * @return false on erroneous blocks, else true
      */
+    bool prepare_handle_incoming_blocks(const std::vector<block_complete_entry>  &blocks_entry, std::vector<block> &blocks);
     bool prepare_handle_incoming_blocks(const std::vector<block_complete_entry>  &blocks);
 
     /**
@@ -1170,7 +1171,7 @@ namespace cryptonote
     uint64_t m_btc_pool_cookie;
     uint64_t m_btc_expected_reward;
     bool m_btc_valid;
-
+    bool m_batch_success;
     std::shared_ptr<tools::Notify> m_block_notify;
     std::shared_ptr<tools::Notify> m_reorg_notify;
     // for prepare_handle_incoming_blocks

@@ -167,12 +167,13 @@ namespace cryptonote
       * added, otherwise true
       */
      bool handle_incoming_block(const blobdata& block_blob, block_verification_context& bvc, bool update_miner_blocktemplate = true);
-
+     bool handle_incoming_block(const blobdata& block_blob, const block *b, block_verification_context& bvc, bool update_miner_blocktemplate = true);
      /**
       * @copydoc Blockchain::prepare_handle_incoming_blocks
       *
       * @note see Blockchain::prepare_handle_incoming_blocks
       */
+     bool prepare_handle_incoming_blocks(const std::vector<block_complete_entry> &blocks_entry, std::vector<block> &blocks);
      bool prepare_handle_incoming_blocks(const std::vector<block_complete_entry>  &blocks);
 
      /**

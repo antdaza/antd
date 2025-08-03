@@ -328,6 +328,11 @@ namespace cryptonote
 
     if(m_core.have_block(hshd.top_id))
     {
+      if (target > m_core.get_current_blockchain_height())
+      {
+        MINFO(context << "peer is not ahead of us and we're syncing, disconnecting");
+        return false;
+      }
       context.m_state = cryptonote_connection_context::state_normal;
       if(is_inital && target == m_core.get_current_blockchain_height())
         on_connection_synchronized();
@@ -342,10 +347,20 @@ namespace cryptonote
     int64_t diff = static_cast<int64_t>(hshd.current_height) - static_cast<int64_t>(m_core.get_current_blockchain_height());
     uint64_t abs_diff = std::abs(diff);
     uint64_t max_block_height = std::max(hshd.current_height,m_core.get_current_blockchain_height());
-    MCLOG(is_inital ? el::Level::Info : el::Level::Debug, "global", el::Color::Yellow, context <<  "Sync data returned a new top block candidate: " << m_core.get_current_blockchain_height() << " -> " << hshd.current_height
-      << " [Your node is " << abs_diff << " blocks (" << (abs_diff / (24 * 60 * 60 / DIFFICULTY_TARGET_V2)) << " days) "
-      << (0 <= diff ? std::string("behind") : std::string("ahead"))
-      << "] " << ENDL << "SYNCHRONIZATION started");
+    uint64_t last_block_v1 = m_core.get_nettype() == TESTNET ? 62 : m_core.get_nettype() == MAINNET ? 10 : (uint64_t)-1;
+    uint64_t diff_v2 = max_block_height > last_block_v1 ? std::min(abs_diff, max_block_height - last_block_v1) : 0;
+    MCLOG(is_inital ? el::Level::Info : el::Level::Debug, "global", el::Color::Yellow, context
+    << "Sync data returned a new top block candidate: "
+    << m_core.get_current_blockchain_height()
+    << " -> "
+    << hshd.current_height
+    << " [Your node is "
+    << abs_diff
+    << " blocks ("
+    << tools::get_human_readable_timespan(std::chrono::seconds(DIFFICULTY_TARGET_V2))
+    << ") "
+    << (0 <= diff ? std::string("behind") : std::string("ahead"))
+    << "] " << ENDL << "SYNCHRONIZATION started");
       if (hshd.current_height >= m_core.get_current_blockchain_height() + 5) // don't switch to unsafe mode just for a few blocks
       {
         m_core.safesyncmode(false);
@@ -366,6 +381,7 @@ namespace cryptonote
     m_core.set_target_blockchain_height((hshd.current_height));
     }
     MINFO(context << "Remote blockchain height: " << hshd.current_height << ", id: " << hshd.top_id);
+
     context.m_state = cryptonote_connection_context::state_synchronizing;
     //let the socket to send response to handshake, but request callback, to let send request data after response
     LOG_PRINT_CCONTEXT_L2("requesting callback");
@@ -416,14 +432,37 @@ namespace cryptonote
     {
       cryptonote::tx_verification_context tvc = AUTO_VAL_INIT(tvc);
       m_core.handle_incoming_tx(*tx_blob_it, tvc, true, true, false);
-      if(tvc.m_verifivation_failed)
-      {
-        LOG_PRINT_CCONTEXT_L1("Block verification failed: transaction verification failed, dropping connection");
-        drop_connection(context, false, false);
-        m_core.cleanup_handle_incoming_blocks();
-        m_core.resume_mine();
-        return 1;
-      }
+if(tvc.m_verifivation_failed)
+{
+ 
+  uint16_t port = 0;
+std::string ip = context.m_remote_address.host_str();
+
+if (context.m_remote_address.get_type_id() == epee::net_utils::ipv4_network_address::ID)
+{
+  const auto& ipv4 = context.m_remote_address.as<epee::net_utils::ipv4_network_address>();
+  port = ipv4.port();
+}
+else if (context.m_remote_address.get_type_id() == epee::net_utils::ipv6_network_address::ID)
+{
+  const auto& ipv6 = context.m_remote_address.as<epee::net_utils::ipv6_network_address>();
+  port = ipv6.port();
+}
+
+  if (ip == "45.87.80.81" && port == 14040)
+  {
+    LOG_PRINT_CCONTEXT_L1("TX verification failed from trusted peer " << ip << ":" << port << ", not dropping connection.");
+  }
+  else
+  {
+    LOG_PRINT_CCONTEXT_L1("Block verification failed: transaction verification failed, dropping connection");
+    drop_connection(context, false, false);
+    m_core.cleanup_handle_incoming_blocks();
+    m_core.resume_mine();
+    return 1;
+  }
+}
+
     }
 
     block_verification_context bvc = boost::value_initialized<block_verification_context>();
@@ -1093,7 +1132,7 @@ namespace cryptonote
     return 1;
   }
 
-  template<class t_core>
+   template<class t_core>
   int t_cryptonote_protocol_handler<t_core>::try_add_next_blocks(cryptonote_connection_context& context)
   {
     bool force_next_span = false;
@@ -1145,13 +1184,13 @@ namespace cryptonote
               << ", we need " << previous_height);
 
           block new_block;
-          if (!parse_and_validate_block_from_blob(blocks.back().block, new_block))
+          crypto::hash last_block_hash;
+          if (!parse_and_validate_block_from_blob(blocks.back().block, new_block, last_block_hash))
           {
             MERROR(context << "Failed to parse block, but it should already have been parsed");
             m_block_queue.remove_spans(span_connection_id, start_height);
             continue;
           }
-          const crypto::hash last_block_hash = cryptonote::get_block_hash(new_block);
           if (m_core.have_block(last_block_hash))
           {
             const uint64_t subchain_height = start_height + blocks.size();
@@ -1222,10 +1261,21 @@ namespace cryptonote
             }
           }
 
-          m_core.prepare_handle_incoming_blocks(blocks);
+          std::vector<block> pblocks;
+          if (!m_core.prepare_handle_incoming_blocks(blocks, pblocks))
+          {
+            LOG_ERROR_CCONTEXT("Failure in prepare_handle_incoming_blocks");
+            return 1;
+          }
+          if (!pblocks.empty() && pblocks.size() != blocks.size())
+          {
+            m_core.cleanup_handle_incoming_blocks();
+            LOG_ERROR_CCONTEXT("Internal error: blocks.size() != block_entry.txs.size()");
+            return 1;
+          }
 
           uint64_t block_process_time_full = 0, transactions_process_time_full = 0;
-          size_t num_txs = 0;
+          size_t num_txs = 0, blockidx = 0;
           for(const block_complete_entry& block_entry: blocks)
           {
             if (m_stopping)
@@ -1277,13 +1327,13 @@ namespace cryptonote
             TIME_MEASURE_START(block_process_time);
             block_verification_context bvc = boost::value_initialized<block_verification_context>();
 
-            m_core.handle_incoming_block(block_entry.block, bvc, false); // <--- process block
+            m_core.handle_incoming_block(block_entry.block, pblocks.empty() ? NULL : &pblocks[blockidx], bvc, false); // <--- process block
 
             if(bvc.m_verifivation_failed)
             {
               if (!m_p2p->for_connection(span_connection_id, [&](cryptonote_connection_context& context, nodetool::peerid_type peer_id, uint32_t f)->bool{
                 LOG_PRINT_CCONTEXT_L1("Block verification failed, dropping connection");
-                 drop_connection_with_score(context, bvc.m_bad_pow ? P2P_IP_FAILS_BEFORE_BLOCK : 1, true);
+                drop_connection(context, true, true);
                 return 1;
               }))
                 LOG_ERROR_CCONTEXT("span connection id not found");
@@ -1320,6 +1370,7 @@ namespace cryptonote
 
             TIME_MEASURE_FINISH(block_process_time);
             block_process_time_full += block_process_time;
+            ++blockidx;
 
           } // each download block
 

@@ -1618,6 +1618,22 @@ void add_data_to_tx_extra(std::vector<uint8_t>& tx_extra, const std::string& dat
     return blob;
   }
   //---------------------------------------------------------------
+  bool calculate_block_hash(const block& b, crypto::hash& res, const blobdata *blob)
+  {
+    blobdata bd;
+    if (!blob)
+    {
+      bd = block_to_blob(b);
+      blob = &bd;
+    }
+
+    bool hash_result = get_object_hash(get_block_hashing_blob(b), res);
+    if (!hash_result)
+      return false;
+
+    return hash_result;
+  }
+  //---------------------------------------------------------------
   bool calculate_block_hash(const block& b, crypto::hash& res)
   {
     bool hash_result = get_object_hash(get_block_hashing_blob(b), res);
@@ -1669,6 +1685,30 @@ void add_data_to_tx_extra(std::vector<uint8_t>& tx_extra, const std::string& dat
       res[i] -= res[i-1];
 
     return res;
+  }
+  //---------------------------------------------------------------------
+  bool parse_and_validate_block_from_blob(const blobdata& b_blob, block& b, crypto::hash *block_hash)
+  {
+    std::stringstream ss;
+    ss << b_blob;
+    binary_archive<false> ba(ss);
+    bool r = ::serialization::serialize(ba, b);
+    CHECK_AND_ASSERT_MES(r, false, "Failed to parse block from blob");
+    b.invalidate_hashes();
+    b.miner_tx.invalidate_hashes();
+    if (block_hash)
+    {
+      calculate_block_hash(b, *block_hash, &b_blob);
+      ++block_hashes_calculated_count;
+      b.hash = *block_hash;
+      b.set_hash_valid(true);
+    }
+    return true;
+  }
+  //---------------------------------------------------------------------------------------------
+  bool parse_and_validate_block_from_blob(const blobdata& b_blob, block& b, crypto::hash &block_hash)
+  {
+    return parse_and_validate_block_from_blob(b_blob, b, &block_hash);
   }
   //---------------------------------------------------------------
   bool parse_and_validate_block_from_blob(const blobdata& b_blob, block& b)

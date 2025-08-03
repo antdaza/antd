@@ -1561,6 +1561,17 @@ namespace cryptonote
     m_blockchain_storage.prepare_handle_incoming_blocks(blocks);
     return true;
   }
+  //-------------------------------------------------------------------------------------------
+  bool core::prepare_handle_incoming_blocks(const std::vector<block_complete_entry> &blocks_entry, std::vector<block> &blocks)
+  {
+    m_incoming_tx_lock.lock();
+    if (!m_blockchain_storage.prepare_handle_incoming_blocks(blocks_entry, blocks))
+    {
+      cleanup_handle_incoming_blocks(false);
+      return false;
+    }
+    return true;
+  }
 
   //-----------------------------------------------------------------------------------------------
   bool core::cleanup_handle_incoming_blocks(bool force_sync)
@@ -1575,6 +1586,45 @@ namespace cryptonote
   }
 
   //-----------------------------------------------------------------------------------------------
+    bool core::handle_incoming_block(const blobdata& block_blob, const block *b, block_verification_context& bvc, bool update_miner_blocktemplate)
+  {
+    TRY_ENTRY();
+
+    bvc = boost::value_initialized<block_verification_context>();
+
+    if (!check_incoming_block_size(block_blob))
+    {
+      bvc.m_verifivation_failed = true;
+      return false;
+    }
+
+    if (((size_t)-1) <= 0xffffffff && block_blob.size() >= 0x3fffffff)
+      MWARNING("This block's size is " << block_blob.size() << ", closing on the 32 bit limit");
+
+    // load json & DNS checkpoints every 10min/hour respectively,
+    // and verify them with respect to what blocks we already have
+    CHECK_AND_ASSERT_MES(update_checkpoints(), false, "One or more checkpoints loaded from json or dns conflicted with existing checkpoints.");
+
+    block lb;
+    if (!b)
+    {
+      crypto::hash block_hash;
+      if(!parse_and_validate_block_from_blob(block_blob, lb, block_hash))
+      {
+        LOG_PRINT_L1("Failed to parse and validate new block");
+        bvc.m_verifivation_failed = true;
+        return false;
+      }
+      b = &lb;
+    }
+    add_new_block(*b, bvc);
+    if(update_miner_blocktemplate && bvc.m_added_to_main_chain)
+       update_miner_block_template();
+    return true;
+
+    CATCH_ENTRY_L0("core::handle_incoming_block()", false);
+  }
+  //-----------------------------------------------------------------------------------------------------
   bool core::handle_incoming_block(const blobdata& block_blob, block_verification_context& bvc, bool update_miner_blocktemplate)
   {
     TRY_ENTRY();

@@ -35,9 +35,7 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/thread/thread.hpp>
 #include <boost/uuid/uuid_io.hpp>
-#include <boost/bind/bind.hpp>
-using namespace boost::placeholders;
-
+#include <boost/bind.hpp>
 #include <atomic>
 
 #include "version.h"
@@ -223,78 +221,29 @@ namespace nodetool
   {
     return make_default_peer_id();
   }
-
-template<class t_payload_net_handler>
-bool nodetool::node_server<t_payload_net_handler>::connect_to_peer(const epee::net_utils::network_address &addr)
-{
-  typename decltype(m_net_server)::t_connection_context context;
-
-  std::string host;
-  uint16_t port_num;
-  std::string bind_ip;
-
-  if (addr.get_type_id() == epee::net_utils::ipv4_network_address::ID)
-  {
-    const auto &ipv4 = addr.as<epee::net_utils::ipv4_network_address>();
-    host = ipv4.host_str();
-    port_num = ipv4.port();
-    bind_ip = "0.0.0.0";
-  }
-  else if (addr.get_type_id() == epee::net_utils::ipv6_network_address::ID)
-  {
-    const auto &ipv6 = addr.as<epee::net_utils::ipv6_network_address>();
-    host = ipv6.host_str();
-    port_num = ipv6.port();
-    bind_ip = "::";
-  }
-
-
-  std::string port = std::to_string(port_num);
-  const uint32_t timeout_ms = 5000;
-
-  MINFO("Connecting to whitelisted peer " << host << ":" << port << " with bind IP: " << bind_ip);
-  return m_net_server.connect(host, port, timeout_ms, context, bind_ip);
-}
-
-
   //-----------------------------------------------------------------------------------
-template<class t_payload_net_handler>
-bool node_server<t_payload_net_handler>::block_host(const epee::net_utils::network_address &addr, time_t seconds)
-{
-  // === Step 1: Whitelist check ===
-  static const std::unordered_set<std::string> trusted_peers = {
-    "45.87.80.81" // Add more IPs as needed
-   ,"129.151.164.223"
-  };
-
-  if (trusted_peers.count(addr.host_str())) {
-    MCLOG_CYAN(el::Level::Info, "global", "Not blocking trusted peer: " << addr.host_str());
-    return false;
-  }
-
-  // === Step 2: Block the host ===
-  CRITICAL_REGION_LOCAL(m_blocked_hosts_lock);
-  m_blocked_hosts[addr.host_str()] = time(nullptr) + seconds;
-
-  // Drop any connection to that IP
-  std::list<boost::uuids::uuid> conns;
-  m_net_server.get_config_object().foreach_connection([&](const p2p_connection_context& cntxt)
+  template<class t_payload_net_handler>
+  bool node_server<t_payload_net_handler>::block_host(const epee::net_utils::network_address &addr, time_t seconds)
   {
-    if (cntxt.m_remote_address.is_same_host(addr))
+    CRITICAL_REGION_LOCAL(m_blocked_hosts_lock);
+    m_blocked_hosts[addr.host_str()] = time(nullptr) + seconds;
+
+    // drop any connection to that IP
+    std::list<boost::uuids::uuid> conns;
+    m_net_server.get_config_object().foreach_connection([&](const p2p_connection_context& cntxt)
     {
-      conns.push_back(cntxt.m_connection_id);
-    }
+      if (cntxt.m_remote_address.is_same_host(addr))
+      {
+        conns.push_back(cntxt.m_connection_id);
+      }
+      return true;
+    });
+    for (const auto &c: conns)
+      m_net_server.get_config_object().close(c);
+
+    MCLOG_CYAN(el::Level::Info, "global", "Host " << addr.host_str() << " blocked.");
     return true;
-  });
-
-  for (const auto &c: conns)
-    m_net_server.get_config_object().close(c);
-
-  MCLOG_CYAN(el::Level::Info, "global", "Host " << addr.host_str() << " blocked.");
-
-
-  return true;
-}
+  }
   //-----------------------------------------------------------------------------------
   template<class t_payload_net_handler>
   bool node_server<t_payload_net_handler>::unblock_host(const epee::net_utils::network_address &address)
@@ -319,7 +268,6 @@ bool node_server<t_payload_net_handler>::block_host(const epee::net_utils::netwo
       auto it = m_host_fails_score.find(address.host_str());
       CHECK_AND_ASSERT_MES(it != m_host_fails_score.end(), false, "internal error");
       it->second = P2P_IP_FAILS_BEFORE_BLOCK/2;
-      //block_host(address);
     }
     return true;
   }
@@ -486,9 +434,9 @@ bool node_server<t_payload_net_handler>::block_host(const epee::net_utils::netwo
     }
     else
     {
-    
-      full_addrs.insert("45.87.80.81:14040");
-      full_addrs.insert("69.62.126.64:14040");
+      full_addrs.insert("129.151.164.223:14040");
+      full_addrs.insert("129.151.164.202:14040");
+      full_addrs.insert("129.151.171.82:14040");
     }
     return full_addrs;
   }
@@ -882,11 +830,18 @@ bool node_server<t_payload_net_handler>::block_host(const epee::net_utils::netwo
       ev.wait();
     }
 
-
+    if(!hsh_result)
+    {
+      LOG_WARNING_CC(context_, "COMMAND_HANDSHAKE Failed");
+      m_net_server.get_config_object().close(context_.m_connection_id);
+    }
+    else
+    {
       try_get_support_flags(context_, [](p2p_connection_context& flags_context, const uint32_t& support_flags) 
       {
         flags_context.support_flags = support_flags;
       });
+    }
 
     return hsh_result;
   }
@@ -1812,7 +1767,7 @@ bool node_server<t_payload_net_handler>::block_host(const epee::net_utils::netwo
       COMMAND_REQUEST_SUPPORT_FLAGS::ID, 
       support_flags_request, 
       m_net_server.get_config_object(),
-      [f](int code, const typename COMMAND_REQUEST_SUPPORT_FLAGS::response& rsp, p2p_connection_context& context_)
+      [=](int code, const typename COMMAND_REQUEST_SUPPORT_FLAGS::response& rsp, p2p_connection_context& context_)
       {  
         if(code < 0)
         {
