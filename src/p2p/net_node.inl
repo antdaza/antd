@@ -299,18 +299,6 @@ bool node_server<t_payload_net_handler>::block_host(const epee::net_utils::netwo
 
   MCLOG_CYAN(el::Level::Info, "global", "Host " << addr.host_str() << " blocked.");
 
-  // === Step 3: Try connecting to another peer ===
-  std::vector<peerlist_entry> gray, white;
-  m_peerlist.get_peerlist_full(gray, white);
-  for (const auto& peer : white)
-  {
-    if (peer.adr.host_str() != addr.host_str())
-    {
-      MCLOG_CYAN(el::Level::Info, "global", "Trying new peer: " << peer.adr.host_str());
-      connect_to_peer(peer.adr);
-      break; // try one at a time
-    }
-  }
 
   return true;
 }
