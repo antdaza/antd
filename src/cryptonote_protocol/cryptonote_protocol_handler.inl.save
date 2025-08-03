@@ -281,7 +281,7 @@ namespace cryptonote
     return connections;
   }
   //------------------------------------------------------------------------------------------------------------------------
-  template<class t_core>
+ /* template<class t_core>
   bool t_cryptonote_protocol_handler<t_core>::process_payload_sync_data(const CORE_SYNC_DATA& hshd, cryptonote_connection_context& context, bool is_inital)
   {
     if(context.m_state == cryptonote_connection_context::state_before_handshake && !is_inital)
@@ -328,11 +328,6 @@ namespace cryptonote
 
     if(m_core.have_block(hshd.top_id))
     {
-      if (target > m_core.get_current_blockchain_height())
-      {
-        MINFO(context << "peer is not ahead of us and we're syncing, disconnecting");
-        return false;
-      }
       context.m_state = cryptonote_connection_context::state_normal;
       if(is_inital && target == m_core.get_current_blockchain_height())
         on_connection_synchronized();
@@ -344,52 +339,79 @@ namespace cryptonote
     /* As I don't know if accessing hshd from core could be a good practice,
     I prefer pushing target height to the core at the same time it is pushed to the user.
     Nz. */
-    int64_t diff = static_cast<int64_t>(hshd.current_height) - static_cast<int64_t>(m_core.get_current_blockchain_height());
-    uint64_t abs_diff = std::abs(diff);
-    uint64_t max_block_height = std::max(hshd.current_height,m_core.get_current_blockchain_height());
-    uint64_t last_block_v1 = m_core.get_nettype() == TESTNET ? 62 : m_core.get_nettype() == MAINNET ? 10 : (uint64_t)-1;
-    uint64_t diff_v2 = max_block_height > last_block_v1 ? std::min(abs_diff, max_block_height - last_block_v1) : 0;
-    MCLOG(is_inital ? el::Level::Info : el::Level::Debug, "global", el::Color::Yellow, context
-    << "Sync data returned a new top block candidate: "
-    << m_core.get_current_blockchain_height()
-    << " -> "
-    << hshd.current_height
-    << " [Your node is "
-    << abs_diff
-    << " blocks ("
-    << tools::get_human_readable_timespan(std::chrono::seconds(DIFFICULTY_TARGET_V2))
-    << ") "
-    << (0 <= diff ? std::string("behind") : std::string("ahead"))
-    << "] " << ENDL << "SYNCHRONIZATION started");
-      if (hshd.current_height >= m_core.get_current_blockchain_height() + 5) // don't switch to unsafe mode just for a few blocks
-      {
-        m_core.safesyncmode(false);
-      }
-      if (m_core.get_target_blockchain_height() == 0) // only when sync starts
-      {
-        m_sync_timer.resume();
-        m_sync_timer.reset();
-        m_add_timer.pause();
-        m_add_timer.reset();
-        m_last_add_end_time = 0;
-        m_sync_spans_downloaded = 0;
-        m_sync_old_spans_downloaded = 0;
-        m_sync_bad_spans_downloaded = 0;
-        m_sync_download_chain_size = 0;
-        m_sync_download_objects_size = 0;
-      }
-    m_core.set_target_blockchain_height((hshd.current_height));
-    }
-    MINFO(context << "Remote blockchain height: " << hshd.current_height << ", id: " << hshd.top_id);
+    int64_t diff = static_cast<int64_t>(hshd.current_height) - static_cast<int64_t>(m_core.get_current_blockchain_heigh
+template<class t_core>
+bool t_cryptonote_protocol_handler<t_core>::process_payload_sync_data(
+    const CORE_SYNC_DATA& hshd, 
+    cryptonote_connection_context& context, 
+    bool is_inital
+) {
+    // Early exit for non-sync states
+    if (context.m_state == cryptonote_connection_context::state_before_handshake && !is_inital)
+        return true;
+    if (context.m_state == cryptonote_connection_context::state_synchronizing)
+        return true;
 
+    // Reject mismatched block versions (post-v6)
+    if (hshd.current_height > 0) {
+        const uint8_t version = m_core.get_ideal_hard_fork_version(hshd.current_height - 1);
+        if (version >= 6 && version != hshd.top_version) {
+            if (version < hshd.top_version && version == m_core.get_ideal_hard_fork_version()) {
+                MCLOG_RED(el::Level::Warning, "global", context << " peer claims higher version (" 
+                    << (unsigned)hshd.top_version << " vs " << (unsigned)version << ")");
+            }
+            return false;
+        }
+    }
+
+    // Validate pruning seed
+    if (hshd.pruning_seed) {
+        const uint32_t stripe = tools::get_pruning_stripe(hshd.pruning_seed);
+        if (stripe == 0 || stripe > (1u << CRYPTONOTE_PRUNING_LOG_STRIPES)) {
+            MWARNING(context << " invalid pruning seed " << hshd.pruning_seed);
+            return false;
+        }
+    }
+
+    // Update context
+    context.m_remote_blockchain_height = hshd.current_height;
+    context.m_pruning_seed = hshd.pruning_seed;
+
+    // Check if we already have the top block
+    const uint64_t current_height = m_core.get_current_blockchain_height();
+    if (m_core.have_block(hshd.top_id)) {
+        context.m_state = cryptonote_connection_context::state_normal;
+        if (is_inital && m_core.get_target_blockchain_height() == current_height)
+            on_connection_synchronized();
+        return true;
+    }
+
+    // Handle sync target update
+    const uint64_t target_height = m_core.get_target_blockchain_height() ?: current_height;
+    if (hshd.current_height > target_height) {
+        const int64_t diff = hshd.current_height - current_height;
+        if (diff >= 5) {
+            m_core.safesyncmode(false); // Disable safe mode if significantly behind
+        }
+
+        // Initialize sync metrics (only on first trigger)
+        if (m_core.get_target_blockchain_height() == 0) {
+            m_sync_timer.resume();
+            m_add_timer.pause();
+            m_sync_spans_downloaded = 0;
+            // ... (reset other metrics)
+        }
+
+        m_core.set_target_blockchain_height(hshd.current_height);
+        MDEBUG(context << "New sync target: " << hshd.current_height << " (local: " << current_height << ")");
+    }
+
+    // Start syncing
     context.m_state = cryptonote_connection_context::state_synchronizing;
-    //let the socket to send response to handshake, but request callback, to let send request data after response
-    LOG_PRINT_CCONTEXT_L2("requesting callback");
     ++context.m_callback_request_count;
     m_p2p->request_callback(context);
-    MLOG_PEER_STATE("requesting callback");
     return true;
-  }
+}
   //------------------------------------------------------------------------------------------------------------------------
   template<class t_core>
   bool t_cryptonote_protocol_handler<t_core>::get_payload_sync_data(CORE_SYNC_DATA& hshd)

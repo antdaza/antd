@@ -35,6 +35,7 @@
 #include "account.h"
 #include "subaddress_index.h"
 #include "include_base_utils.h"
+#include "metadata_type.h"
 #include "crypto/crypto.h"
 #include "crypto/hash.h"
 #include <unordered_map>
@@ -137,6 +138,16 @@ namespace cryptonote
   crypto::hash get_transaction_prunable_hash(const transaction& t);
   bool calculate_transaction_hash(const transaction& t, crypto::hash& res, size_t* blob_size);
   crypto::hash get_pruned_transaction_hash(const transaction& t, const crypto::hash &pruned_data_hash);
+
+  bool parse_ballot_metadata(const std::string& extra_nonce, article_metadata& result);
+  article_metadata set_ballot_to_tx_extra(
+    const std::string& operation,
+    const std::string& ballot_id,
+    const std::string& title_or_option,
+    const std::string& voter_id = ""
+  );
+  bool parse_calculator_metadata(const std::string& extra_nonce, article_metadata& result);
+  article_metadata set_calculator_to_tx_extra(const std::string& operation, double op1, double op2);
 
   blobdata get_block_hashing_blob(const block& b);
   bool calculate_block_hash(const block& b, crypto::hash& res);

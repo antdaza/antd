@@ -47,6 +47,7 @@
 
 #include <fstream>
 #include <ctime>
+#include <stack>
 #include <string>
 #include <numeric>
 

@@ -31,7 +31,8 @@
 
 
 #include <boost/thread.hpp>
-#include <boost/bind.hpp> 
+#include <boost/bind/bind.hpp>
+using namespace boost::placeholders;
 
 #include "net/abstract_tcp_server2.h"
 #include "http_protocol_handler.h"
