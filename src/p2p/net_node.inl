@@ -782,6 +782,8 @@ namespace nodetool
       if(rsp.node_data.network_id != m_network_id)
       {
         LOG_WARNING_CC(context, "COMMAND_HANDSHAKE Failed, wrong network!  (" << rsp.node_data.network_id << "), closing connection.");
+  CRITICAL_REGION_LOCAL(m_conn_fails_cache_lock);
+  m_conn_fails_cache[context.m_remote_address] = time(NULL);
         return;
       }
 
