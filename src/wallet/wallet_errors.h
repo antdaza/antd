@@ -39,7 +39,7 @@
 #include "cryptonote_core/cryptonote_tx_utils.h"
 #include "rpc/core_rpc_server_commands_defs.h"
 #include "include_base_utils.h"
-
+#include "cryptonote_core/constants.h"
 
 namespace tools
 {
@@ -183,7 +183,7 @@ namespace tools
       {
         std::ostringstream ss;
         cryptonote::transaction tx = m_tx;
-        ss << wallet_internal_error::to_string() << ", tx:\n" << cryptonote::obj_to_json_str(tx);
+        ss << wallet_internal_error::to_string() << ", tx:\n" << cryptonote::print_transaction_as_json_safe(tx);
         return ss.str();
       }
 
@@ -363,7 +363,7 @@ namespace tools
       {
         std::ostringstream ss;
         cryptonote::transaction tx = m_tx;
-        ss << refresh_error::to_string() << ", tx: " << cryptonote::obj_to_json_str(tx);
+        ss << refresh_error::to_string() << ", tx: " << cryptonote::print_transaction_as_json_safe(tx);
         return ss.str();
       }
 
@@ -651,7 +651,7 @@ namespace tools
         std::ostringstream ss;
         ss << transfer_error::to_string() << ", status = " << m_status << ", tx:\n";
         cryptonote::transaction tx = m_tx;
-        ss << cryptonote::obj_to_json_str(tx);
+        ss << cryptonote::print_transaction_as_json_safe(tx);
         if (!m_reason.empty())
         {
           ss << " (" << m_reason << ")";
@@ -721,7 +721,7 @@ namespace tools
         ss << transfer_error::to_string() <<
           ", tx_weight_limit = " << m_tx_weight_limit <<
           ", tx weight = " << get_transaction_weight(m_tx) <<
-          ", tx:\n" << cryptonote::obj_to_json_str(tx);
+          ", tx:\n" << cryptonote::print_transaction_as_json_safe(tx);
         return ss.str();
       }
 

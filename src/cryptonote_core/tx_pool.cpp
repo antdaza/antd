@@ -46,6 +46,7 @@
 #include "warnings.h"
 #include "common/perf_timer.h"
 #include "crypto/hash.h"
+#include "cryptonote_core/constants.h"
 
 #undef ANTD_DEFAULT_LOG_CATEGORY
 #define ANTD_DEFAULT_LOG_CATEGORY "txpool"
@@ -949,7 +950,7 @@ namespace cryptonote
         return true;
       }
       tx.set_hash(txid);
-      txi.tx_json = obj_to_json_str(tx);
+      txi.tx_json = print_transaction_as_json_safe(tx);
       txi.blob_size = bd->size();
       txi.weight = meta.weight;
       txi.fee = meta.fee;
@@ -1298,7 +1299,7 @@ namespace cryptonote
           MERROR("Failed to parse tx from txpool");
           return true; // continue
         }
-        ss << obj_to_json_str(tx) << std::endl;
+        ss << print_transaction_as_json_safe(tx) << std::endl;
       }
       ss << "blob_size: " << (short_format ? "-" : std::to_string(txblob->size())) << std::endl
         << "weight: " << meta.weight << std::endl

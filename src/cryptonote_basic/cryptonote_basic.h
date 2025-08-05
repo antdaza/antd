@@ -49,6 +49,7 @@
 #include "misc_language.h"
 #include "ringct/rctTypes.h"
 #include "device/device.hpp"
+#include "string_tools.h"
 
 namespace cryptonote
 {
@@ -166,6 +167,11 @@ namespace cryptonote
     };
     static version get_min_version_for_hf(int hf_version, cryptonote::network_type nettype = MAINNET);
     static version get_max_version_for_hf(int hf_version, cryptonote::network_type nettype = MAINNET);
+template <class Archive>
+bool do_serialize(Archive& ar)
+{
+  return serialize(ar);
+}
 
     // tx information
     size_t   version;
@@ -197,26 +203,34 @@ namespace cryptonote
       uint16_t type;
     };
 
-    BEGIN_SERIALIZE()
-      VARINT_FIELD(version)
-      if (version > 2)
-      {
-        FIELD(output_unlock_times)
-        if (version == version_3_per_output_unlock_times)
-          FIELD(is_deregister)
-      }
-      if(version == 0 || version > version_4_tx_types) return false;
-      VARINT_FIELD(unlock_time)
-      FIELD(vin)
-      FIELD(vout)
-      if (version >= 3 && vout.size() != output_unlock_times.size()) return false;
-      FIELD(extra)
-      if (version >= version_4_tx_types)
-      {
-        VARINT_FIELD(type) // NOTE(antd): Overwrites is_deregister
-        if (static_cast<uint16_t>(type) >= type_count) return false;
-      }
-    END_SERIALIZE()
+  template <class Archive>
+bool serialize(Archive& ar)
+{
+  VARINT_FIELD(version)
+  if (version > 2)
+  {
+    FIELD(output_unlock_times)
+    if (version == version_3_per_output_unlock_times)
+      FIELD(is_deregister)
+  }
+  if (version == 0 || version > version_4_tx_types) return false;
+  VARINT_FIELD(unlock_time)
+  FIELD(vin)
+  FIELD(vout)
+  if (version >= 3 && vout.size() != output_unlock_times.size()) return false;
+
+  if constexpr (!std::is_same_v<Archive, json_archive<true>>)
+  {
+    FIELD(extra); // only include in binary, NOT in JSON
+  }
+
+  if (version >= version_4_tx_types)
+  {
+    VARINT_FIELD(type)
+    if (static_cast<uint16_t>(type) >= type_count) return false;
+  }
+  return true;
+}
 
   public:
     transaction_prefix(){ set_null(); }

@@ -220,15 +220,17 @@ namespace cryptonote
     return true;
   }
   //---------------------------------------------------------------
-  template <typename T>
-  std::string obj_to_json_str(T& obj)
-  {
-    std::stringstream ss;
-    json_archive<true> ar(ss, true);
-    bool r = ::serialization::serialize(ar, obj);
-    CHECK_AND_ASSERT_MES(r, "", "obj_to_json_str failed: serialization::serialize returned false");
-    return ss.str();
-  }
+   template <typename T> 
+std::string obj_to_json_str(T& obj)
+{
+  std::stringstream ss;
+  json_archive<true> ar(ss, true);
+  bool r = ::serialization::serialize(ar, obj);
+
+  const std::string result = ss.str();
+  return result;
+}
+
   //---------------------------------------------------------------
   // 62387455827 -> 455827 + 7000000 + 80000000 + 300000000 + 2000000000 + 60000000000, where 455827 <= dust_threshold
   template<typename chunk_handler_t, typename dust_handler_t>

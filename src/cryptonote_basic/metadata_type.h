@@ -1,6 +1,9 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include "serialization/keyvalue_serialization.h"
+#include "crypto/crypto.h"
+#include "serialization/json_archive.h"
 
 enum class metadata_type_t : uint8_t {
   ARTICLE = 0x01,
@@ -27,8 +30,7 @@ struct calculator_metadata {
 struct article_metadata {
   bool success;
   std::string error;
-  std::string serialized_blob;
-
+  std::vector<uint8_t> serialized_blob;
   std::string title;
   std::string content;
   std::string publisher;
@@ -37,5 +39,12 @@ struct article_metadata {
   boost::optional<calculator_metadata> calc;
   boost::optional<ballot_metadata> ballot;
 
-  article_metadata() : success(false), error(""), title(""), content(""), publisher(""), content_hash(crypto::null_hash) {}
+  article_metadata()
+    : success(false), error(""), title(""), content(""),
+      publisher(""), content_hash(crypto::null_hash) {}
+
+  // Declare serialize
+  template <class Archive>
+  bool serialize(Archive& ar);
 };
+

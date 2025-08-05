@@ -131,7 +131,7 @@ using namespace cryptonote;
 
 static const std::string MULTISIG_SIGNATURE_MAGIC = "SigMultisigPkV1";
 static const std::string MULTISIG_EXTRA_INFO_MAGIC = "MultisigxV1";
-
+  template bool tools::wallet2::tx_construction_data::serialize<json_archive<true>>(json_archive<true>&);
 namespace
 {
   std::string get_default_ringdb_path()
@@ -6403,7 +6403,7 @@ bool wallet2::parse_tx_from_str(const std::string &signed_tx_st, std::vector<too
     return false;
   }
   LOG_PRINT_L0("Loaded signed tx data from binary: " << signed_txs.ptx.size() << " transactions");
-  for (auto &c_ptx: signed_txs.ptx) LOG_PRINT_L0(cryptonote::obj_to_json_str(c_ptx.tx));
+  for (auto &c_ptx: signed_txs.ptx) LOG_PRINT_L0(cryptonote::print_transaction_as_json_safe(c_ptx.tx));
 
   if (accept_func && !accept_func(signed_txs))
   {
@@ -6543,7 +6543,7 @@ bool wallet2::load_multisig_tx(cryptonote::blobdata s, multisig_tx_set &exported
   }
 
   LOG_PRINT_L1("Loaded multisig tx unsigned data from binary: " << exported_txs.m_ptx.size() << " transactions");
-  for (auto &ptx: exported_txs.m_ptx) LOG_PRINT_L0(cryptonote::obj_to_json_str(ptx.tx));
+  for (auto &ptx: exported_txs.m_ptx) LOG_PRINT_L0(cryptonote::print_transaction_as_json_safe(ptx.tx));
 
   if (accept_func && !accept_func(exported_txs))
   {
@@ -10440,7 +10440,7 @@ void wallet2::cold_sign_tx(const std::vector<pending_tx>& ptx_vector, signed_tx_
   tx_device_aux = aux_data.tx_device_aux;
 
   MDEBUG("Signed tx data from hw: " << exported_txs.ptx.size() << " transactions");
-  for (auto &c_ptx: exported_txs.ptx) LOG_PRINT_L0(cryptonote::obj_to_json_str(c_ptx.tx));
+  for (auto &c_ptx: exported_txs.ptx) LOG_PRINT_L0(cryptonote::print_transaction_as_json_safe(c_ptx.tx));
 }
 //----------------------------------------------------------------------------------------------------
 uint64_t wallet2::cold_key_image_sync(uint64_t &spent, uint64_t &unspent) {

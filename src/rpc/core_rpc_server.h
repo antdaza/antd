@@ -39,13 +39,16 @@
 #include "cryptonote_core/cryptonote_core.h"
 #include "p2p/net_node.h"
 #include "cryptonote_protocol/cryptonote_protocol_handler.h"
-
+#include "cryptonote_core/constants.h"
 // yes, epee doesn't properly use its full namespace when calling its
 // functions from macros.  *sigh*
 using namespace epee;
 
 namespace cryptonote
 {
+  class pruned_transaction; // forward declare
+  std::string print_transaction_as_json_safe(const pruned_transaction& ptx);
+ 
   /************************************************************************/
   /*                                                                      */
   /************************************************************************/

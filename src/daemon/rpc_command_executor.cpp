@@ -1035,7 +1035,7 @@ bool t_rpc_command_executor::print_transaction(crypto::hash transaction_hash,
     {
       try
       {
-        tools::success_msg_writer() << cryptonote::obj_to_json_str(tx) << std::endl;
+        tools::success_msg_writer() << cryptonote::print_transaction_as_json_safe(tx) << std::endl;
       }
       catch (const std::exception& e)
       {

@@ -51,6 +51,8 @@ using namespace epee;
 #include "core_rpc_server_error_codes.h"
 #include "p2p/net_node.h"
 #include "version.h"
+#include "cryptonote_core/constants.h"
+
 
 #undef ANTD_DEFAULT_LOG_CATEGORY
 #define ANTD_DEFAULT_LOG_CATEGORY "daemon.rpc"
@@ -248,6 +250,7 @@ namespace cryptonote
   class pruned_transaction {
     transaction& tx;
   public:
+    const transaction& get_tx() const { return tx; }
     pruned_transaction(transaction& tx) : tx(tx) {}
     BEGIN_SERIALIZE_OBJECT()
       bool r = tx.serialize_base(ar);
@@ -489,7 +492,66 @@ namespace cryptonote
     res.status = CORE_RPC_STATUS_OK;
     LOG_PRINT_L2("COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES: [" << res.o_indexes.size() << "]");
     return true;
+   }
+std::string print_transaction_as_json_safe(const pruned_transaction& ptx) {
+  const transaction& tx = ptx.get_tx();
+  std::ostringstream ss;
+  ss << "{\n";
+  ss << "  \"version\": " << static_cast<int>(tx.version) << ",\n";
+  ss << "  \"unlock_time\": " << tx.unlock_time << ",\n";
+  ss << "  \"extra\": \"" << epee::to_hex::string(epee::span<const uint8_t>(tx.extra.data(), tx.extra.size())) << "\",\n";
+
+  // Inputs
+  ss << "  \"vin\": [\n";
+  for (size_t i = 0; i < tx.vin.size(); ++i) {
+    const txin_v& in = tx.vin[i];
+    ss << "    {\n";
+
+    if (in.type() == typeid(txin_to_key)) {
+      const txin_to_key& tk = boost::get<txin_to_key>(in);
+      ss << "      \"type\": \"txin_to_key\",\n";
+      ss << "      \"amount\": " << tk.amount << ",\n";
+      ss << "      \"key_image\": \"" << epee::string_tools::pod_to_hex(tk.k_image) << "\",\n";
+      ss << "      \"key_offsets\": [";
+      for (size_t j = 0; j < tk.key_offsets.size(); ++j) {
+        ss << tk.key_offsets[j];
+        if (j + 1 < tk.key_offsets.size()) ss << ", ";
+      }
+      ss << "]\n";
+    } else {
+      ss << "      \"type\": \"other\"\n";
+    }
+
+    ss << "    }";
+    if (i + 1 < tx.vin.size()) ss << ",";
+    ss << "\n";
   }
+  ss << "  ],\n";
+
+  // Outputs
+  ss << "  \"vout\": [\n";
+  for (size_t i = 0; i < tx.vout.size(); ++i) {
+    const tx_out& out = tx.vout[i];
+    ss << "    {\n";
+    ss << "      \"amount\": " << out.amount << ",\n";
+    ss << "      \"output_index\": " << i << ",\n";
+
+    if (out.target.type() == typeid(txout_to_key)) {
+      const txout_to_key& tk = boost::get<txout_to_key>(out.target);
+      ss << "      \"key\": \"" << epee::string_tools::pod_to_hex(tk.key) << "\"\n";
+    } else {
+      ss << "      \"type\": \"non-txout_to_key\"\n";
+    }
+
+    ss << "    }";
+    if (i + 1 < tx.vout.size()) ss << ",";
+    ss << "\n";
+  }
+  ss << "  ]\n";
+
+  ss << "}";
+  return ss.str();
+}
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_transactions(const COMMAND_RPC_GET_TRANSACTIONS::request& req, COMMAND_RPC_GET_TRANSACTIONS::response& res, const connection_context *ctx)
   {
@@ -626,10 +688,10 @@ namespace cryptonote
             if (req.prune)
             {
               pruned_transaction pruned_tx{t};
-              e.as_json = obj_to_json_str(pruned_tx);
+              e.as_json = print_transaction_as_json_safe(pruned_tx);
             }
             else
-              e.as_json = obj_to_json_str(t);
+              e.as_json = print_transaction_as_json_safe(t);
           }
         }
       }

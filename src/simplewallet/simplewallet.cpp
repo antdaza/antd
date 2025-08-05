@@ -5749,7 +5749,8 @@ article_metadata set_article_to_tx_extra(const std::string& title, const std::st
     serialized.push_back(static_cast<uint8_t>(article_info.publisher.size()));
     serialized.insert(serialized.end(), article_info.publisher.begin(), article_info.publisher.end());
 
-    result.serialized_blob = std::string("ARTC") + std::string(serialized.begin(), serialized.end());
+    result.serialized_blob = {'A', 'R', 'T', 'C'};
+    result.serialized_blob.insert(result.serialized_blob.end(), serialized.begin(), serialized.end());
     //message_writer() << tr("Debug: set_article_to_tx_extra: Serialization completed, size: ") << result.serialized_blob.size();
     //message_writer() << tr("Debug: set_article_to_tx_extra: Serialized data (hex): ") << epee::string_tools::buff_to_hex_nodelim(result.serialized_blob);
   } catch (const std::exception& e) {
@@ -5895,9 +5896,6 @@ static bool parse_article_metadata(const std::string& extra_nonce, article_metad
   }
 }
 //----------------------------------------------------------------------------------------------------
-#include <common/util.h> // For epee::to_hex
-#include <string_tools.h> // For epee::string_tools
-
 bool simple_wallet::show_article(const std::vector<std::string>& args)
 {
   // Check if transaction ID is provided
@@ -6165,7 +6163,7 @@ if (!article_meta.success) {
 }
 
 //message_writer() << tr("Debug: Adding article metadata to tx_extra");
-std::string extra_nonce = article_meta.serialized_blob; // Remove extra "ARTC"
+blobdata extra_nonce(article_meta.serialized_blob.begin(), article_meta.serialized_blob.end());
 if (!add_extra_nonce_to_tx_extra(extra, extra_nonce)) {
   fail_msg_writer() << tr("Failed to add article metadata to tx_extra");
   return false;

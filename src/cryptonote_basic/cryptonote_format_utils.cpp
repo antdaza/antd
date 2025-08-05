@@ -789,7 +789,8 @@ void add_data_to_tx_extra(std::vector<uint8_t>& tx_extra, const std::string& dat
   append_double(calc_data.operand2);
   append_double(calc_data.result);
 
-  result.serialized_blob = std::string("CALC") + std::string(serialized.begin(), serialized.end());
+  result.serialized_blob = {'C', 'A', 'L', 'C'};
+  result.serialized_blob.insert(result.serialized_blob.end(), serialized.begin(), serialized.end());
   result.success = true;
   result.calc = calc_data;
 
@@ -881,7 +882,8 @@ void add_data_to_tx_extra(std::vector<uint8_t>& tx_extra, const std::string& dat
   for (int i = 0; i < 8; i++)
     data.push_back((ts >> (i * 8)) & 0xFF);
 
-  result.serialized_blob = std::string("BALC") + std::string(data.begin(), data.end());
+  result.serialized_blob = {'B', 'A', 'L', 'C'};
+  result.serialized_blob.insert(result.serialized_blob.end(), data.begin(), data.end());
   result.success = true;
   result.ballot = ballot;
 

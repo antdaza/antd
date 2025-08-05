@@ -185,7 +185,7 @@ int main(int argc, char* argv[])
       std::cout << "Parsed pruned transaction:" << std::endl;
     else
       std::cout << "Parsed transaction:" << std::endl;
-    std::cout << cryptonote::obj_to_json_str(tx) << std::endl;
+    std::cout << cryptonote::print_transaction_as_json_safe(tx) << std::endl;
 
     bool parsed = cryptonote::parse_tx_extra(tx.extra, fields);
     if (!parsed)

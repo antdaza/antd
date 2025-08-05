@@ -407,40 +407,132 @@ namespace tools
         m_amount_in(utd.m_amount_in), m_amount_out(utd.m_amount_out), m_change(utd.m_change), m_block_height(height), m_dests(utd.m_dests), m_payment_id(utd.m_payment_id), m_timestamp(utd.m_timestamp), m_unlock_time(utd.m_tx.unlock_time), m_unlock_times(utd.m_tx.output_unlock_times), m_subaddr_account(utd.m_subaddr_account), m_subaddr_indices(utd.m_subaddr_indices), m_rings(utd.m_rings) {}
     };
 
-    struct tx_construction_data
-    {
-      std::vector<cryptonote::tx_source_entry> sources;
-      cryptonote::tx_destination_entry change_dts;
-      std::vector<cryptonote::tx_destination_entry> splitted_dsts; // split, includes change
-      std::vector<size_t> selected_transfers;
-      std::vector<uint8_t> extra;
-      uint64_t unlock_time;
-      bool v2_use_rct;
-      bool v3_use_bulletproofs;
-      bool v3_use_clsg;
-      bool v3_per_output_unlock;
-      bool v4_allow_tx_types;
-      std::vector<cryptonote::tx_destination_entry> dests; // original setup, does not include change
-      uint32_t subaddr_account;   // subaddress account of your wallet to be used in this transfer
-      std::set<uint32_t> subaddr_indices;  // set of address indices used as inputs in this transfer
+    struct tx_construction_data {
+  std::vector<cryptonote::tx_source_entry> sources;
+  cryptonote::tx_destination_entry change_dts;
+  std::vector<cryptonote::tx_destination_entry> splitted_dsts; // split, includes change
+  std::vector<size_t> selected_transfers;
+  std::vector<uint8_t> extra;
+  uint64_t unlock_time;
+  bool v2_use_rct;
+  bool v3_use_bulletproofs;
+  bool v3_use_clsg;
+  bool v3_per_output_unlock;
+  bool v4_allow_tx_types;
+  std::vector<cryptonote::tx_destination_entry> dests; // original setup, does not include change
+  uint32_t subaddr_account;
+  std::set<uint32_t> subaddr_indices;
 
-      BEGIN_SERIALIZE_OBJECT()
-        FIELD(sources)
-        FIELD(change_dts)
-        FIELD(splitted_dsts)
-        FIELD(selected_transfers)
-        FIELD(extra)
-        FIELD(unlock_time)
-        FIELD(v2_use_rct)
-        FIELD(v3_use_bulletproofs)
-        FIELD(v3_use_clsg)
-        FIELD(v3_per_output_unlock)
-        FIELD(v4_allow_tx_types)
-        FIELD(dests)
-        FIELD(subaddr_account)
-        FIELD(subaddr_indices)
-      END_SERIALIZE()
-    };
+  template <class Archive>
+  bool serialize(Archive& ar) {
+    if constexpr (std::is_same_v<Archive, json_archive<true>>) {
+      ar.begin_object();
+      
+      // Serialize sources
+      ar.tag("sources");
+      ar.begin_array(sources.size());
+      for (auto& item : sources) {
+        ar.begin_object();
+        item.do_serialize(ar); // Use do_serialize instead of serialize
+        ar.end_object();
+        if (&item != &sources.back()) ar.delimit_array();
+      }
+      ar.end_array();
+      
+      // Serialize change_dts
+      ar.tag("change_dts");
+      ar.begin_object();
+      change_dts.do_serialize(ar); // Use do_serialize
+      ar.end_object();
+      
+      // Serialize splitted_dsts
+      ar.tag("splitted_dsts");
+      ar.begin_array(splitted_dsts.size());
+      for (auto& item : splitted_dsts) {
+        ar.begin_object();
+        item.do_serialize(ar); // Use do_serialize
+        ar.end_object();
+        if (&item != &splitted_dsts.back()) ar.delimit_array();
+      }
+      ar.end_array();
+      
+      // Serialize selected_transfers
+      ar.tag("selected_transfers");
+      ar.begin_array(selected_transfers.size());
+      for (auto& item : selected_transfers) {
+        ar.serialize_varint(item); // size_t
+        if (&item != &selected_transfers.back()) ar.delimit_array();
+      }
+      ar.end_array();
+      
+      // OMIT extra field for JSON serialization
+      
+      // Serialize unlock_time
+      ar.tag("unlock_time");
+      ar.serialize_varint(unlock_time); // uint64_t
+      
+      // Serialize boolean flags
+      ar.tag("v2_use_rct");
+      ar.serialize_varint(v2_use_rct); // bool as 0/1
+      
+      ar.tag("v3_use_bulletproofs");
+      ar.serialize_varint(v3_use_bulletproofs); // bool as 0/1
+      
+      ar.tag("v3_use_clsg");
+      ar.serialize_varint(v3_use_clsg); // bool as 0/1
+      
+      ar.tag("v3_per_output_unlock");
+      ar.serialize_varint(v3_per_output_unlock); // bool as 0/1
+      
+      ar.tag("v4_allow_tx_types");
+      ar.serialize_varint(v4_allow_tx_types); // bool as 0/1
+      
+      // Serialize dests
+      ar.tag("dests");
+      ar.begin_array(dests.size());
+      for (auto& item : dests) {
+        ar.begin_object();
+        item.do_serialize(ar); // Use do_serialize
+        ar.end_object();
+        if (&item != &dests.back()) ar.delimit_array();
+      }
+      ar.end_array();
+      
+      // Serialize subaddr_account
+      ar.tag("subaddr_account");
+      ar.serialize_varint(subaddr_account); // uint32_t
+      
+      // Serialize subaddr_indices
+      ar.tag("subaddr_indices");
+      ar.begin_array(subaddr_indices.size());
+      auto it = subaddr_indices.begin();
+      for (size_t i = 0; i < subaddr_indices.size(); ++i) {
+        ar.serialize_varint(*it); // uint32_t
+        if (i < subaddr_indices.size() - 1) ar.delimit_array();
+        ++it;
+      }
+      ar.end_array();
+      
+      ar.end_object();
+    } else {
+      FIELD(sources);
+      FIELD(change_dts);
+      FIELD(splitted_dsts);
+      FIELD(selected_transfers);
+      FIELD(extra); // Include extra for binary serialization
+      FIELD(unlock_time);
+      FIELD(v2_use_rct);
+      FIELD(v3_use_bulletproofs);
+      FIELD(v3_use_clsg);
+      FIELD(v3_per_output_unlock);
+      FIELD(v4_allow_tx_types);
+      FIELD(dests);
+      FIELD(subaddr_account);
+      FIELD(subaddr_indices);
+      }
+      return true;
+     }
+   };
 
     typedef std::vector<transfer_details> transfer_container;
     typedef std::unordered_multimap<crypto::hash, payment_details> payment_container;

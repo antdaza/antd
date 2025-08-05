@@ -779,12 +779,6 @@ namespace nodetool
     {
       epee::misc_utils::auto_scope_leave_caller scope_exit_handler = epee::misc_utils::create_scope_leave_handler([&](){ev.raise();});
 
-      if(code < 0)
-      {
-        LOG_WARNING_CC(context, "COMMAND_HANDSHAKE invoke failed. (" << code <<  ", " << epee::levin::get_err_descr(code) << ")");
-        return;
-      }
-
       if(rsp.node_data.network_id != m_network_id)
       {
         LOG_WARNING_CC(context, "COMMAND_HANDSHAKE Failed, wrong network!  (" << rsp.node_data.network_id << "), closing connection.");
@@ -830,19 +824,11 @@ namespace nodetool
       ev.wait();
     }
 
-    if(!hsh_result)
-    {
-      LOG_WARNING_CC(context_, "COMMAND_HANDSHAKE Failed");
-      m_net_server.get_config_object().close(context_.m_connection_id);
-    }
-    else
-    {
       try_get_support_flags(context_, [](p2p_connection_context& flags_context, const uint32_t& support_flags) 
       {
         flags_context.support_flags = support_flags;
       });
-    }
-
+   
     return hsh_result;
   }
   //-----------------------------------------------------------------------------------
@@ -1108,9 +1094,6 @@ namespace nodetool
     if(it == m_conn_fails_cache.end())
       return false;
 
-    if(time(NULL) - it->second > P2P_FAILED_ADDR_FORGET_SECONDS)
-      return false;
-    else
       return true;
   }
   //-----------------------------------------------------------------------------------

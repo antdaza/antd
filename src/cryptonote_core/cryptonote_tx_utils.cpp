@@ -820,7 +820,7 @@ namespace cryptonote
         i++;
       }
 
-      MCINFO("construct_tx", "transaction_created: " << get_transaction_hash(tx) << ENDL << obj_to_json_str(tx) << ENDL << ss_ring_s.str());
+      MCINFO("construct_tx", "transaction_created: " << get_transaction_hash(tx) << ENDL << print_transaction_as_json_safe(tx) << ENDL << ss_ring_s.str());
     }
     else
     {
@@ -933,7 +933,7 @@ namespace cryptonote
 
       CHECK_AND_ASSERT_MES(tx.vout.size() == outSk.size(), false, "outSk size does not match vout");
 
-      MCINFO("construct_tx", "transaction_created: " << get_transaction_hash(tx) << ENDL << obj_to_json_str(tx) << ENDL);
+      MCINFO("construct_tx", "transaction_created: " << get_transaction_hash(tx) << ENDL << print_transaction_as_json_safe(tx) << ENDL);
     }
 
     tx.invalidate_hashes();
