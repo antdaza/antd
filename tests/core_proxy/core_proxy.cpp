@@ -197,6 +197,33 @@ bool tests::proxy_core::handle_incoming_txs(const std::vector<blobdata>& tx_blob
     return true;
 }
 
+bool tests::proxy_core::handle_incoming_block(const cryptonote::blobdata& block_blob,
+                                              cryptonote::block* b,
+                                              cryptonote::block_verification_context& bvc,
+                                              bool update_miner_blocktemplate)
+{
+  block parsed_block = AUTO_VAL_INIT(parsed_block);
+
+  if (!parse_and_validate_block_from_blob(block_blob, parsed_block)) {
+    std::cerr << "Failed to parse and validate block blob (ptr version)" << std::endl;
+    bvc.m_verifivation_failed = true;
+    return false;
+  }
+
+  if (b != nullptr)
+    *b = parsed_block;
+
+   crypto::hash h = get_block_hash(parsed_block);
+  crypto::hash lh = get_block_longhash(nullptr, parsed_block, 0, 0);
+
+  if (!add_block(h, lh, parsed_block, block_blob)) {
+    bvc.m_verifivation_failed = true;
+    return false;
+  }
+
+  bvc.m_verifivation_failed = false;
+  return true;
+}
 bool tests::proxy_core::handle_incoming_block(const cryptonote::blobdata& block_blob, cryptonote::block_verification_context& bvc, bool update_miner_blocktemplate) {
     block b = AUTO_VAL_INIT(b);
 

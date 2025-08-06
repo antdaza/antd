@@ -166,8 +166,20 @@ namespace full_nodes
     END_SERIALIZE()
   };
 
+  uint64_t uniform_distribution_portable(std::mt19937_64& mersenne_twister, uint64_t n);
+
   template<typename T>
-  void antd_shuffle(std::vector<T>& a, uint64_t seed);
+  void antd_shuffle(std::vector<T>& a, uint64_t seed)
+  {
+    if (a.size() <= 1) return;
+    std::mt19937_64 mersenne_twister(seed);
+    for (size_t i = 1; i < a.size(); i++)
+    {
+      size_t j = (size_t)uniform_distribution_portable(mersenne_twister, i+1);
+      if (i != j)
+        std::swap(a[i], a[j]);
+    }
+  }
 
   class full_node_list
     : public cryptonote::Blockchain::BlockAddedHook,
