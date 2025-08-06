@@ -59,7 +59,7 @@ namespace full_nodes
     return full_node_info::version_2_infinite_staking;
   }
 
-  static uint64_t uniform_distribution_portable(std::mt19937_64& mersenne_twister, uint64_t n)
+  uint64_t uniform_distribution_portable(std::mt19937_64& mersenne_twister, uint64_t n)
   {
     uint64_t secureMax = mersenne_twister.max() - mersenne_twister.max() % n;
     uint64_t x;
@@ -559,22 +559,19 @@ namespace full_nodes
     calc_swarm_changes(existing_swarms, seed);
 
     /// Apply changes
-    for (const auto entry : existing_swarms) {
+  for (const auto& entry : existing_swarms) {
+  const swarm_id_t swarm_id = entry.first;
+  const std::vector<crypto::public_key>& snodes = entry.second;
 
-      const swarm_id_t swarm_id = entry.first;
-      const std::vector<crypto::public_key>& snodes = entry.second;
+  for (const auto& snode : snodes) {
+    auto& sn_info = m_transient_state.full_nodes_infos.at(snode);
+    if (sn_info.swarm_id == swarm_id) continue;
 
-      for (const auto snode : snodes) {
-
-        auto& sn_info = m_transient_state.full_nodes_infos.at(snode);
-        if (sn_info.swarm_id == swarm_id) continue; /// nothing changed for this snode
-
-        /// modify info and record the change
-        m_transient_state.rollback_events.push_back(std::unique_ptr<rollback_event>(new rollback_change(height, snode, sn_info)));
-        sn_info.swarm_id = swarm_id;
-      }
-
+    m_transient_state.rollback_events.push_back(
+        std::unique_ptr<rollback_event>(new rollback_change(height, snode, sn_info)));
+    sn_info.swarm_id = swarm_id;
     }
+   }
   }
 
   static bool get_contribution(cryptonote::network_type nettype, int hard_fork_version, const cryptonote::transaction& tx, uint64_t block_height, parsed_tx_contribution &parsed_contribution)
@@ -1452,19 +1449,6 @@ namespace full_nodes
     }
 
     return true;
-  }
-
-  template<typename T>
-  void antd_shuffle(std::vector<T>& a, uint64_t seed)
-  {
-    if (a.size() <= 1) return;
-    std::mt19937_64 mersenne_twister(seed);
-    for (size_t i = 1; i < a.size(); i++)
-    {
-      size_t j = (size_t)uniform_distribution_portable(mersenne_twister, i+1);
-      if (i != j)
-        std::swap(a[i], a[j]);
-    }
   }
 
   void full_node_list::store_quorum_state_from_rewards_list(uint64_t height)

@@ -43,7 +43,7 @@
 #include "cryptonote_basic/cryptonote_format_utils.h"
 #include "cryptonote_core/constants.h"
 #include "cryptonote_basic/miner.h"
-
+#include "cryptonote_core/full_node_list.h"
 #include "chaingen.h"
 #include "device/device.hpp"
 using namespace std;

@@ -58,6 +58,34 @@ public:
   bool handle_incoming_txs(const std::vector<cryptonote::blobdata>& tx_blob, std::vector<cryptonote::tx_verification_context>& tvc, bool keeped_by_block, bool relayed, bool do_not_relay) { return true; }
   bool handle_incoming_block(const cryptonote::blobdata& block_blob, cryptonote::block_verification_context& bvc, bool update_miner_blocktemplate = true) { return true; }
   bool handle_uptime_proof(const cryptonote::NOTIFY_UPTIME_PROOF::request &proof) { return false; }
+  bool handle_incoming_block(const cryptonote::blobdata& block_blob,
+                           cryptonote::block* b,
+                           cryptonote::block_verification_context& bvc,
+                           bool update_miner_blocktemplate)
+{
+  if (b != nullptr)
+  {
+    cryptonote::block parsed_block;
+    if (!cryptonote::parse_and_validate_block_from_blob(block_blob, parsed_block))
+    {
+      bvc.m_verifivation_failed = true;
+      return false;
+    }
+    *b = parsed_block;
+  }
+
+  bvc.m_verifivation_failed = false;
+  return true;
+}
+
+bool prepare_handle_incoming_blocks(const std::vector<cryptonote::block_complete_entry> &blocks_entry,
+                                    std::vector<cryptonote::block> &blocks)
+{
+
+  blocks.resize(blocks_entry.size());
+  return true;
+}
+
   void pause_mine(){}
   void resume_mine(){}
   bool on_idle(){return true;}
