@@ -223,6 +223,12 @@ namespace cryptonote
     "Recalculate per-block difficulty starting from the height specified",
     0};
 
+  static const command_line::arg_descriptor<bool> arg_keep_alt_blocks  = {
+    "keep-alt-blocks"
+  , "Keep alternative blocks on restart"
+  , false
+  };
+
   //-----------------------------------------------------------------------------------------------
   core::core(i_cryptonote_protocol* pprotocol):
               m_mempool(m_blockchain_storage),
@@ -342,6 +348,7 @@ namespace cryptonote
     command_line::add_arg(desc, arg_prune_blockchain);
     command_line::add_arg(desc, arg_reorg_notify);
     command_line::add_arg(desc, arg_block_rate_notify);
+    command_line::add_arg(desc, arg_keep_alt_blocks);
 
     command_line::add_arg(desc, arg_recalculate_difficulty);
 #if defined(ANTD_ENABLE_INTEGRATION_TEST_HOOKS)
@@ -517,6 +524,7 @@ namespace cryptonote
     std::string check_updates_string = command_line::get_arg(vm, arg_check_updates);
     size_t max_txpool_weight = command_line::get_arg(vm, arg_max_txpool_weight);
     bool prune_blockchain = command_line::get_arg(vm, arg_prune_blockchain);
+    bool keep_alt_blocks = command_line::get_arg(vm, arg_keep_alt_blocks);
 
     if (m_full_node)
     {
@@ -756,6 +764,9 @@ namespace cryptonote
 
     r = m_miner.init(vm, m_nettype);
     CHECK_AND_ASSERT_MES(r, false, "Failed to initialize miner instance");
+
+    if (!keep_alt_blocks && !m_blockchain_storage.get_db().is_read_only())
+      m_blockchain_storage.get_db().drop_alt_blocks();
 
     if (prune_blockchain)
     {

@@ -660,7 +660,6 @@ bool Blockchain::reset_and_set_genesis_block(const block& b)
   LOG_PRINT_L3("Blockchain::" << __func__);
   CRITICAL_REGION_LOCAL(m_blockchain_lock);
   m_timestamps_and_difficulties_height = 0;
-  m_alternative_chains.clear();
   invalidate_block_template_cache();
   m_db->reset();
   m_db->drop_alt_blocks();
@@ -1992,7 +1991,6 @@ bool Blockchain::handle_alternative_block(const block& b, const crypto::hash& id
 
   //block is not related with head of main chain
   //first of all - look in alternative chains container
-  auto it_prev = m_alternative_chains.find(b.prev_id);
   alt_block_data_t prev_data;
   bool parent_in_alt = m_db->get_alt_block(b.prev_id, &prev_data, NULL);
   bool parent_in_main = m_db->block_exists(b.prev_id);
@@ -2005,6 +2003,12 @@ bool Blockchain::handle_alternative_block(const block& b, const crypto::hash& id
     if (!build_alt_chain(b.prev_id, alt_chain, timestamps, bvc))
       return false;
 
+    block_extended_info bei = boost::value_initialized<block_extended_info>();
+    bei.bl = b;
+    const uint64_t prev_height = alt_chain.size() ? prev_data.height : m_db->get_block_height(b.prev_id);
+    bei.height = prev_height + 1;
+    uint64_t block_reward = get_outs_money_amount(b.miner_tx);
+    bei.already_generated_coins = block_reward + (alt_chain.size() ? prev_data.already_generated_coins : m_db->get_block_already_generated_coins(prev_height));
 
     // verify that the block's timestamp is within the acceptable range
     // (not earlier than the median of the last X blocks)
@@ -2014,11 +2018,6 @@ bool Blockchain::handle_alternative_block(const block& b, const crypto::hash& id
       bvc.m_verifivation_failed = true;
       return false;
     }
-
-    // FIXME: consider moving away from block_extended_info at some point
-    block_extended_info bei = boost::value_initialized<block_extended_info>();
-    bei.bl = b;
-    bei.height = alt_chain.size() ? it_prev->second.height + 1 : m_db->get_block_height(b.prev_id) + 1;
 
     bool is_a_checkpoint;
     if(!m_checkpoints.check_block(bei.height, id, is_a_checkpoint))
@@ -2078,7 +2077,8 @@ bool Blockchain::handle_alternative_block(const block& b, const crypto::hash& id
     difficulty_type main_chain_cumulative_difficulty = m_db->get_block_cumulative_difficulty(m_db->height() - 1);
     if (alt_chain.size())
     {
-      bei.cumulative_difficulty = it_prev->second.cumulative_difficulty;
+      bei.cumulative_difficulty = prev_data.cumulative_difficulty_high;
+      bei.cumulative_difficulty = (bei.cumulative_difficulty << 64) + prev_data.cumulative_difficulty_low;
     }
     else
     {
