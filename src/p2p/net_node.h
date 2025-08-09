@@ -48,12 +48,33 @@
 #include "math_helper.h"
 #include "net_node_common.h"
 #include "common/command_line.h"
+#include <functional>
 
 PUSH_WARNINGS
 DISABLE_VS_WARNINGS(4355)
 
+    // Constants for blacklist
+    static constexpr size_t MAX_FAILED_PINGS = 3; // Threshold before blacklisting
+    static constexpr std::chrono::seconds BLACKLIST_DURATION{600}; // 10 minutes
+
+
+namespace std {
+    template<>
+    struct hash<epee::net_utils::network_address> {
+        size_t operator()(const epee::net_utils::network_address& addr) const {
+            return std::hash<std::string>{}(addr.host_str());
+        }
+    };
+}
+
 namespace nodetool
 {
+
+
+    // Declare global variables with extern
+    extern std::unordered_map<epee::net_utils::network_address, size_t> m_failed_ping_counts;
+    extern std::unordered_map<epee::net_utils::network_address, std::chrono::steady_clock::time_point> m_blacklisted_until;
+
   template<class base_type>
   struct p2p_connection_context_t: base_type //t_payload_net_handler::connection_context //public net_utils::connection_context_base
   {
@@ -178,6 +199,15 @@ namespace nodetool
     bool store_config();
     bool check_trust(const proof_of_trust& tr);
 
+    // Ping blacklisting functions
+
+    bool is_blacklisted(const epee::net_utils::network_address& addr) const;
+    void register_failed_ping(const epee::net_utils::network_address& addr);
+    void register_success_ping(const epee::net_utils::network_address& addr);
+    template<typename Callback>
+    bool try_ping_with_blacklist(
+    p2p_connection_context& context,
+    Callback&& success_cb);
 
     //----------------- levin_commands_handler -------------------------------------------------------------
     virtual void on_connection_new(p2p_connection_context& context);

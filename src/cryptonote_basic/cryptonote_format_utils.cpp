@@ -108,6 +108,26 @@ namespace cryptonote
       ge_p1p1_to_p3(&A2, &tmp3);
       ge_p3_tobytes(&AB, &A2);
   }
+
+  uint64_t get_transaction_weight_clawback(const transaction &tx, size_t n_padded_outputs)
+  {
+    const rct::rctSig &rv = tx.rct_signatures;
+    const uint64_t bp_base = 368;
+    const size_t n_outputs = tx.vout.size();
+    if (n_padded_outputs <= 2)
+      return 0;
+    size_t nlr = 0;
+    while ((1u << nlr) < n_padded_outputs)
+      ++nlr;
+    nlr += 6;
+    const size_t bp_size = 32 * (9 + 2 * nlr);
+    CHECK_AND_ASSERT_THROW_MES_L1(n_outputs <= BULLETPROOF_MAX_OUTPUTS, "maximum number of outputs is " + std::to_string(BULLETPROOF_MAX_OUTPUTS) + " per transaction");
+    CHECK_AND_ASSERT_THROW_MES_L1(bp_base * n_padded_outputs >= bp_size, "Invalid bulletproof clawback: bp_base " + std::to_string(bp_base) + ", n_padded_outputs "
+        + std::to_string(n_padded_outputs) + ", bp_size " + std::to_string(bp_size));
+    const uint64_t bp_clawback = (bp_base * n_padded_outputs - bp_size) * 4 / 5;
+    return bp_clawback;
+  }
+  //---------------------------------------------------------------
 }
 
 namespace cryptonote
@@ -398,6 +418,47 @@ namespace cryptonote
     const uint64_t bp_clawback = (bp_base * n_padded_outputs - bp_size) * 4 / 5;
     CHECK_AND_ASSERT_THROW_MES_L1(bp_clawback <= std::numeric_limits<uint64_t>::max() - blob_size, "Weight overflow");
     return blob_size + bp_clawback;
+  }
+  //---------------------------------------------------------------
+  uint64_t get_pruned_transaction_weight(const transaction &tx)
+  {
+    CHECK_AND_ASSERT_MES(tx.pruned, std::numeric_limits<uint64_t>::max(), "get_pruned_transaction_weight does not support non pruned txes");
+    CHECK_AND_ASSERT_MES(tx.version >= 2, std::numeric_limits<uint64_t>::max(), "get_pruned_transaction_weight does not support v1 txes");
+     CHECK_AND_ASSERT_MES(!tx.vin.empty(), std::numeric_limits<uint64_t>::max(), "empty vin");
+    CHECK_AND_ASSERT_MES(tx.vin[0].type() == typeid(cryptonote::txin_to_key), std::numeric_limits<uint64_t>::max(), "empty vin");
+
+    // get pruned data size
+    std::ostringstream s;
+    binary_archive<true> a(s);
+    ::serialization::serialize(a, const_cast<transaction&>(tx));
+    uint64_t weight = s.str().size(), extra;
+
+    // nbps (technically varint)
+    weight += 1;
+
+    // calculate deterministic bulletproofs size (assumes canonical BP format)
+    size_t nrl = 0, n_padded_outputs;
+    while ((n_padded_outputs = (1u << nrl)) < tx.vout.size())
+      ++nrl;
+    nrl += 6;
+    extra = 32 * (9 + 2 * nrl) + 2;
+    weight += extra;
+
+    // calculate deterministic MLSAG data size
+    const size_t ring_size = boost::get<cryptonote::txin_to_key>(tx.vin[0]).key_offsets.size();
+    extra = tx.vin.size() * (ring_size * (1 + 1) * 32 + 32 /* cc */);
+    weight += extra;
+
+    // calculate deterministic pseudoOuts size
+    extra =  32 * (tx.vin.size());
+    weight += extra;
+
+    // clawback
+    uint64_t bp_clawback = get_transaction_weight_clawback(tx, n_padded_outputs);
+    CHECK_AND_ASSERT_THROW_MES_L1(bp_clawback <= std::numeric_limits<uint64_t>::max() - weight, "Weight overflow");
+    weight += bp_clawback;
+
+    return weight;
   }
   //---------------------------------------------------------------
   uint64_t get_transaction_weight(const transaction &tx)

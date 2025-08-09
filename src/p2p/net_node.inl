@@ -1095,9 +1095,9 @@ namespace nodetool
   {
     CRITICAL_REGION_LOCAL(m_conn_fails_cache_lock);
     auto it = m_conn_fails_cache.find(addr);
-    if(it == m_conn_fails_cache.end())
+    if(it == m_conn_fails_cache.end()) {
       return false;
-
+    }
       return true;
   }
   //-----------------------------------------------------------------------------------
@@ -1654,94 +1654,122 @@ namespace nodetool
     return true;
   }
   //-----------------------------------------------------------------------------------
-  template<class t_payload_net_handler> template<class t_callback>
-  bool node_server<t_payload_net_handler>::try_ping(basic_node_data& node_data, p2p_connection_context& context, const t_callback &cb)
+   template<class t_payload_net_handler>
+   template<class t_callback>
+   bool node_server<t_payload_net_handler>::try_ping(
+    basic_node_data& node_data,
+    p2p_connection_context& context,
+    const t_callback &cb)
+{
+  // Skip blacklisted peers
+  if (is_blacklisted(context.m_remote_address))
   {
-    if(!node_data.my_port)
+    LOG_WARNING_CC(context, "Skipping ping to blacklisted peer "
+      << context.m_remote_address.host_str());
+    return false;
+  }
+
+  if (!node_data.my_port)
+    return false;
+
+  CHECK_AND_ASSERT_MES(
+    context.m_remote_address.get_type_id() == epee::net_utils::ipv4_network_address::ID ||
+    context.m_remote_address.get_type_id() == epee::net_utils::ipv6_network_address::ID,
+    false,
+    "Only IPv4 and IPv6 addresses are supported here");
+
+  std::string ip;
+  std::string port;
+  epee::net_utils::network_address address;
+  peerid_type pr;
+
+  if (context.m_remote_address.get_type_id() == epee::net_utils::ipv4_network_address::ID)
+  {
+    const epee::net_utils::network_address na = context.m_remote_address;
+    uint32_t actual_ip = na.as<const epee::net_utils::ipv4_network_address>().ip();
+    if (!m_peerlist.is_host_allowed(context.m_remote_address))
       return false;
+    ip = epee::string_tools::get_ip_string_from_int32(actual_ip);
+    port = epee::string_tools::num_to_string_fast(node_data.my_port);
+    address = epee::net_utils::network_address{
+      epee::net_utils::ipv4_network_address(actual_ip, node_data.my_port)};
+    pr = node_data.peer_id;
+  }
+  else
+  {
+    const epee::net_utils::network_address na = context.m_remote_address;
+    ip = na.as<const epee::net_utils::ipv6_network_address>().ip();
+    if (!m_peerlist.is_host_allowed(context.m_remote_address))
+      return false;
+    port = epee::string_tools::num_to_string_fast(node_data.my_port);
+    address = epee::net_utils::network_address{
+      epee::net_utils::ipv6_network_address(ip, node_data.my_port)};
+    pr = node_data.peer_id;
+  }
 
-    CHECK_AND_ASSERT_MES(context.m_remote_address.get_type_id() == epee::net_utils::ipv4_network_address::ID || 
-	context.m_remote_address.get_type_id() == epee::net_utils::ipv6_network_address::ID, false,
-        "Only IPv4 and IPv6 addresses are supported here");
-
-    std::string ip;
-    std::string port;
-    epee::net_utils::network_address address;
-    peerid_type pr;
-
-    if (context.m_remote_address.get_type_id() == epee::net_utils::ipv4_network_address::ID)
+  bool r = m_net_server.connect_async(
+    ip, port, m_config.m_net_config.ping_connection_timeout,
+    [cb, address, pr, this](const typename net_server::t_connection_context& ping_context,
+                             const boost::system::error_code& ec) -> bool
+  {
+    if (ec)
     {
-      const epee::net_utils::network_address na = context.m_remote_address;
-      uint32_t actual_ip = na.as<const epee::net_utils::ipv4_network_address>().ip();
-      if(!m_peerlist.is_host_allowed(context.m_remote_address))
-	return false;
-      ip = epee::string_tools::get_ip_string_from_int32(actual_ip);
-      port = epee::string_tools::num_to_string_fast(node_data.my_port);
-      address = epee::net_utils::network_address{epee::net_utils::ipv4_network_address(actual_ip, node_data.my_port)};
-      pr = node_data.peer_id;
+      LOG_WARNING_CC(ping_context, "back ping connect failed to " << address.str());
+      register_failed_ping(ping_context.m_remote_address); // Blacklist tracking
+      return false;
     }
-    else
-    {
-      const epee::net_utils::network_address na = context.m_remote_address;
-      ip = na.as<const epee::net_utils::ipv6_network_address>().ip();
-      if(!m_peerlist.is_host_allowed(context.m_remote_address))
-	return false;
-      port = epee::string_tools::num_to_string_fast(node_data.my_port);
-      address = epee::net_utils::network_address{epee::net_utils::ipv6_network_address(ip, node_data.my_port)};
-      pr = node_data.peer_id;
-    }
-    bool r = m_net_server.connect_async(ip, port, m_config.m_net_config.ping_connection_timeout, [cb, /*context,*/ address, pr, this](
-      const typename net_server::t_connection_context& ping_context,
-      const boost::system::error_code& ec)->bool
-    {
-      if(ec)
-      {
-        LOG_WARNING_CC(ping_context, "back ping connect failed to " << address.str());
-        return false;
-      }
-      COMMAND_PING::request req;
-      COMMAND_PING::response rsp;
-      //vc2010 workaround
-      /*std::string ip_ = ip;
-      std::string port_=port;
-      peerid_type pr_ = pr;
-      auto cb_ = cb;*/
 
-      // GCC 5.1.0 gives error with second use of uint64_t (peerid_type) variable.
-      peerid_type pr_ = pr;
+    COMMAND_PING::request req;
+    COMMAND_PING::response rsp;
+    peerid_type pr_ = pr;
 
-      bool inv_call_res = epee::net_utils::async_invoke_remote_command2<COMMAND_PING::response>(ping_context.m_connection_id, COMMAND_PING::ID, req, m_net_server.get_config_object(),
+    bool inv_call_res =
+      epee::net_utils::async_invoke_remote_command2<COMMAND_PING::response>(
+        ping_context.m_connection_id, COMMAND_PING::ID, req,
+        m_net_server.get_config_object(),
         [=](int code, const COMMAND_PING::response& rsp, p2p_connection_context& context)
-      {
-        if(code <= 0)
-        {
-          LOG_WARNING_CC(ping_context, "Failed to invoke COMMAND_PING to " << address.str() << "(" << code <<  ", " << epee::levin::get_err_descr(code) << ")");
-          return;
-        }
-
-        if(rsp.status != PING_OK_RESPONSE_STATUS_TEXT || pr != rsp.peer_id)
-        {
-          LOG_WARNING_CC(ping_context, "back ping invoke wrong response \"" << rsp.status << "\" from" << address.str() << ", hsh_peer_id=" << pr_ << ", rsp.peer_id=" << rsp.peer_id);
-          m_net_server.get_config_object().close(ping_context.m_connection_id);
-          return;
-        }
-        m_net_server.get_config_object().close(ping_context.m_connection_id);
-        cb();
-      });
-
-      if(!inv_call_res)
-      {
-        LOG_WARNING_CC(ping_context, "back ping invoke failed to " << address.str());
-        m_net_server.get_config_object().close(ping_context.m_connection_id);
-        return false;
-      }
-      return true;
-    });
-    if(!r)
     {
-      LOG_WARNING_CC(context, "Failed to call connect_async, network error.");
+      if (code <= 0)
+      {
+        LOG_WARNING_CC(ping_context, "Failed to invoke COMMAND_PING to " << address.str()
+          << " (" << code << ", " << epee::levin::get_err_descr(code) << ")");
+        register_failed_ping(context.m_remote_address);
+        return;
+      }
+
+      if (rsp.status != PING_OK_RESPONSE_STATUS_TEXT || pr != rsp.peer_id)
+      {
+        LOG_WARNING_CC(ping_context, "back ping invoke wrong response \"" << rsp.status
+          << "\" from " << address.str() << ", hsh_peer_id=" << pr_
+          << ", rsp.peer_id=" << rsp.peer_id);
+        m_net_server.get_config_object().close(ping_context.m_connection_id);
+        register_failed_ping(context.m_remote_address);
+        return;
+      }
+
+      // Success: close and reset fail count
+      m_net_server.get_config_object().close(ping_context.m_connection_id);
+      register_success_ping(context.m_remote_address);
+      cb();
+    });
+
+    if (!inv_call_res)
+    {
+      LOG_WARNING_CC(ping_context, "back ping invoke failed to " << address.str());
+      m_net_server.get_config_object().close(ping_context.m_connection_id);
+      register_failed_ping(ping_context.m_remote_address);
+      return false;
     }
-    return r;
+    return true;
+  });
+
+  if (!r)
+  {
+    LOG_WARNING_CC(context, "Failed to call connect_async, network error.");
+    register_failed_ping(context.m_remote_address);
+  }
+
+   return r;
   }
   //-----------------------------------------------------------------------------------
   template<class t_payload_net_handler>
@@ -1768,35 +1796,140 @@ namespace nodetool
     );
 
     return r;
+  }
+  //----------------------------------------------------new----------------------------
+  template<class t_payload_net_handler>
+bool node_server<t_payload_net_handler>::is_blacklisted(const epee::net_utils::network_address& addr) const
+{
+    auto it = m_blacklisted_until.find(addr);
+    if (it != m_blacklisted_until.end())
+    {
+        if (std::chrono::steady_clock::now() < it->second)
+            return true;
+        else
+            m_blacklisted_until.erase(it);
+    }
+    return false;
+}
+  //-----------------------------------------------------------------------------------------
+  template<class t_payload_net_handler>
+  void node_server<t_payload_net_handler>::register_failed_ping(const epee::net_utils::network_address& addr)
+  {
+    auto& count = m_failed_ping_counts[addr];
+    count++;
+    if (count >= MAX_FAILED_PINGS)
+    {
+        m_blacklisted_until[addr] = std::chrono::steady_clock::now() + BLACKLIST_DURATION;
+        m_failed_ping_counts.erase(addr);
+        MINFO("Blacklisting " << addr.host_str() << " for " << BLACKLIST_DURATION.count() << " seconds due to repeated ping failures.");
+    }
   }  
   //-----------------------------------------------------------------------------------
   template<class t_payload_net_handler>
-  int node_server<t_payload_net_handler>::handle_timed_sync(int command, typename COMMAND_TIMED_SYNC::request& arg, typename COMMAND_TIMED_SYNC::response& rsp, p2p_connection_context& context)
+  void node_server<t_payload_net_handler>::register_success_ping(const epee::net_utils::network_address& addr)
   {
-    if(!m_payload_handler.process_payload_sync_data(arg.payload_data, context, false))
+    m_failed_ping_counts.erase(addr);
+    m_blacklisted_until.erase(addr);
+   }
+  //------------------------------------------------------------------------------------
+  template<class t_payload_net_handler>
+template<typename Callback>
+bool node_server<t_payload_net_handler>::try_ping_with_blacklist(
+    p2p_connection_context& context,
+    Callback&& success_cb)
+{
+    // Blacklist check
+    if (is_blacklisted(context.m_remote_address)) // Use is_blacklisted or define is_peer_blacklisted
     {
-      LOG_WARNING_CC(context, "Failed to process_payload_sync_data(), dropping connection");
-      drop_connection(context);
-      return 1;
+        LOG_DEBUG_CC(context, "Peer is blacklisted: "
+            << context.m_remote_address.str());
+        return false;
     }
 
-    //fill response
-    rsp.local_time = time(NULL);
-    m_peerlist.get_peerlist_head(rsp.local_peerlist_new);
-    m_payload_handler.get_payload_sync_data(rsp.payload_data);
-    LOG_DEBUG_CC(context, "COMMAND_TIMED_SYNC");
+    // Build the ping request
+    COMMAND_PING::request ping_req{}; // Empty request, as defined
+
+    // Async ping
+    epee::net_utils::async_invoke_remote_command2<COMMAND_PING::response, COMMAND_PING::request>(
+        context.m_connection_id,
+        COMMAND_PING::ID,
+        ping_req,
+        m_net_server.get_config_object(),
+        [this, &context, success_cb](int code, const COMMAND_PING::response& resp, const p2p_connection_context_t<typename t_payload_net_handler::connection_context>&) {
+            if (code == 0 && resp.status == PING_OK_RESPONSE_STATUS_TEXT)
+            {
+                register_success_ping(context.m_remote_address);
+                success_cb();
+            }
+            else
+            {
+                register_failed_ping(context.m_remote_address);
+                LOG_WARNING_CC(context, "Ping failed to "
+                    << context.m_remote_address.host_str());
+            }
+        },
+        P2P_DEFAULT_HANDSHAKE_INVOKE_TIMEOUT);
+
+    return true;
+}
+  //------------------------------------------------------------------------------------
+  template<class t_payload_net_handler>
+  int node_server<t_payload_net_handler>::handle_timed_sync(
+    int command,
+    typename COMMAND_TIMED_SYNC::request& arg,
+    typename COMMAND_TIMED_SYNC::response& rsp,
+    p2p_connection_context& context)
+  {
+  // Skip if peer is already blacklisted
+  if (is_blacklisted(context.m_remote_address))
+  {
+    LOG_WARNING_CC(context, "Skipping TIMED_SYNC from blacklisted address " 
+      << context.m_remote_address.host_str());
+    drop_connection(context);
     return 1;
+  }
+
+  if (!m_payload_handler.process_payload_sync_data(arg.payload_data, context, false))
+  {
+    LOG_WARNING_CC(context, "Failed to process_payload_sync_data(), dropping connection");
+    register_failed_ping(context.m_remote_address); // Treat as failure
+    drop_connection(context);
+    return 1;
+  }
+
+  // Attempt a ping here too — blacklist if it fails
+  try_ping_with_blacklist(context, [this, &context]()
+  {
+    register_success_ping(context.m_remote_address);
+  });
+
+  // Fill response
+  rsp.local_time = time(NULL);
+  m_peerlist.get_peerlist_head(rsp.local_peerlist_new);
+  m_payload_handler.get_payload_sync_data(rsp.payload_data);
+
+  LOG_DEBUG_CC(context, "COMMAND_TIMED_SYNC");
+  return 1;
   }
   //-----------------------------------------------------------------------------------
   template<class t_payload_net_handler>
   int node_server<t_payload_net_handler>::handle_handshake(int command, typename COMMAND_HANDSHAKE::request& arg, typename COMMAND_HANDSHAKE::response& rsp, p2p_connection_context& context)
   {
-    if(arg.node_data.network_id != m_network_id)
-    {
 
-      LOG_INFO_CC(context, "WRONG NETWORK AGENT CONNECTED! id=" << arg.node_data.network_id);
+     if(arg.node_data.network_id != m_network_id)
+     {
+       LOG_INFO_CC(context, "WRONG NETWORK AGENT CONNECTED! id=" << arg.node_data.network_id);
+       register_failed_ping(context.m_remote_address); // Treat wrong network as a failure
+       drop_connection(context);
+       add_host_fail(context.m_remote_address);
+       return 1;
+     }
+
+     // Blacklist check before proceeding
+    if (is_blacklisted(context.m_remote_address))
+    {
+      LOG_WARNING_CC(context, "Connection attempt from blacklisted address " << context.m_remote_address.host_str());
       drop_connection(context);
-      add_host_fail(context.m_remote_address);
       return 1;
     }
 
@@ -1840,54 +1973,67 @@ namespace nodetool
     context.peer_id = arg.node_data.peer_id;
     context.m_in_timedsync = false;
 
-    if(arg.node_data.peer_id != m_config.m_peer_id && arg.node_data.my_port)
-    {
-      peerid_type peer_id_l = arg.node_data.peer_id;
-      uint32_t port_l = arg.node_data.my_port;
-      //try ping to be sure that we can add this peer to peer_list
-      try_ping(arg.node_data, context, [peer_id_l, port_l, context, this]()
-      {
-        CHECK_AND_ASSERT_MES(context.m_remote_address.get_type_id() == epee::net_utils::ipv4_network_address::ID || context.m_remote_address.get_type_id() == epee::net_utils::ipv6_network_address::ID, void(),
-            "Only IPv4 or IPv6 addresses are supported here");
-        //called only(!) if success pinged, update local peerlist
+   if (arg.node_data.peer_id != m_config.m_peer_id && arg.node_data.my_port)
+{
+    peerid_type peer_id_l = arg.node_data.peer_id;
+    uint32_t port_l = arg.node_data.my_port;
+
+    try_ping_with_blacklist(context, [peer_id_l, port_l, context, this]() {
+        CHECK_AND_ASSERT_MES(
+            context.m_remote_address.get_type_id() == epee::net_utils::ipv4_network_address::ID ||
+            context.m_remote_address.get_type_id() == epee::net_utils::ipv6_network_address::ID,
+            void(),
+            "Only IPv4 or IPv6 addresses are supported here"
+        );
+
+        // Called only if ping succeeded — update local peerlist
         peerlist_entry pe;
         const epee::net_utils::network_address na = context.m_remote_address;
 
-	if (context.m_remote_address.get_type_id() == epee::net_utils::ipv4_network_address::ID)
-	{
-	  pe.adr = epee::net_utils::ipv4_network_address(na.as<epee::net_utils::ipv4_network_address>().ip(), port_l);
-	}
-	else
-	{
-	  pe.adr = epee::net_utils::ipv6_network_address(na.as<epee::net_utils::ipv6_network_address>().ip(), port_l);
-	}
+        if (context.m_remote_address.get_type_id() == epee::net_utils::ipv4_network_address::ID)
+        {
+            pe.adr = epee::net_utils::ipv4_network_address(
+                na.as<epee::net_utils::ipv4_network_address>().ip(), port_l);
+        }
+        else
+        {
+            pe.adr = epee::net_utils::ipv6_network_address(
+                na.as<epee::net_utils::ipv6_network_address>().ip(), port_l);
+        }
 
         time_t last_seen;
         time(&last_seen);
         pe.last_seen = static_cast<int64_t>(last_seen);
         pe.id = peer_id_l;
         pe.pruning_seed = context.m_pruning_seed;
-        this->m_peerlist.append_with_peer_white(pe);
-        LOG_DEBUG_CC(context, "PING SUCCESS " << context.m_remote_address.host_str() << ":" << port_l);
-      });
-    }
-    
-    try_get_support_flags(context, [](p2p_connection_context& flags_context, const uint32_t& support_flags) 
-    {
-      flags_context.support_flags = support_flags;
-    });
 
-    //fill response
-    m_peerlist.get_peerlist_head(rsp.local_peerlist_new);
-    get_local_node_data(rsp.node_data);
-    m_payload_handler.get_payload_sync_data(rsp.payload_data);
-    LOG_DEBUG_CC(context, "COMMAND_HANDSHAKE");
-    return 1;
+        this->m_peerlist.append_with_peer_white(pe);
+        LOG_DEBUG_CC(context, "PING SUCCESS "
+            << context.m_remote_address.host_str() << ":" << port_l);
+    });
+}
+try_get_support_flags(context, [](p2p_connection_context& flags_context, const uint32_t& support_flags) {
+    flags_context.support_flags = support_flags;
+});
+
+// Fill response
+m_peerlist.get_peerlist_head(rsp.local_peerlist_new);
+get_local_node_data(rsp.node_data);
+m_payload_handler.get_payload_sync_data(rsp.payload_data);
+LOG_DEBUG_CC(context, "COMMAND_HANDSHAKE");
+return 1;
+
   }
   //-----------------------------------------------------------------------------------
   template<class t_payload_net_handler>
   int node_server<t_payload_net_handler>::handle_ping(int command, COMMAND_PING::request& arg, COMMAND_PING::response& rsp, p2p_connection_context& context)
   {
+  if (is_blacklisted(context.m_remote_address))
+  {
+    LOG_WARNING_CC(context, "PING received from blacklisted address " << context.m_remote_address.host_str());
+    drop_connection(context);
+    return 1;
+  }
     LOG_DEBUG_CC(context, "COMMAND_PING");
     rsp.status = PING_OK_RESPONSE_STATUS_TEXT;
     rsp.peer_id = m_config.m_peer_id;

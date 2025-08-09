@@ -425,7 +425,7 @@ public:
 
       bool double_spend_seen; //!< true iff another tx was seen double spending this one
     };
-
+    bool get_transaction_info(const crypto::hash &txid, tx_details &td) const;
   private:
 
     /**

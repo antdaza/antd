@@ -159,7 +159,9 @@ namespace cryptonote
     bool transfer_main(int transfer_type, const std::vector<std::string> &args, bool called_by_mms);
     bool transfer(const std::vector<std::string> &args);
     bool show_article(const std::vector<std::string>& args);
+    bool article_long(int transfer_type, const std::vector<std::string>& args_, bool called_by_mms);
     bool article_main(int transfer_type, const std::vector<std::string> &args_, bool called_by_mms);
+    bool add_article_long(const std::vector<std::string> &args_);
     bool add_article(const std::vector<std::string> &args);
     bool locked_transfer(const std::vector<std::string> &args);
     bool stake(const std::vector<std::string> &args_);

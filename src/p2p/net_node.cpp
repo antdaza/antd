@@ -34,6 +34,9 @@
 
 namespace nodetool
 {
+    std::unordered_map<epee::net_utils::network_address, size_t> m_failed_ping_counts;
+    std::unordered_map<epee::net_utils::network_address, std::chrono::steady_clock::time_point> m_blacklisted_until;
+
     const command_line::arg_descriptor<std::string> arg_p2p_bind_ip        = {"p2p-bind-ip", "Interface for p2p network protocol (IPv4)", "0.0.0.0"};
     const command_line::arg_descriptor<std::string> arg_p2p_bind_ipv6_address        = {"p2p-bind-ipv6-address", "Interface for p2p network protocol (IPv6)", "::"};
     const command_line::arg_descriptor<std::string, false, true, 2> arg_p2p_bind_port = {

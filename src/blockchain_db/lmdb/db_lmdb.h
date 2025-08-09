@@ -67,6 +67,8 @@ typedef struct mdb_txn_cursors
   MDB_cursor *m_txc_txpool_meta;
   MDB_cursor *m_txc_txpool_blob;
 
+  MDB_cursor *m_txc_alt_blocks;
+
   MDB_cursor *m_txc_hf_versions;
 
   MDB_cursor *m_txc_full_node_data;
@@ -93,6 +95,7 @@ typedef struct mdb_txn_cursors
 #define m_cur_hf_versions	m_cursors->m_txc_hf_versions
 #define m_cur_full_node_data	m_cursors->m_txc_full_node_data
 #define m_cur_properties	m_cursors->m_txc_properties
+#define m_cur_alt_blocks	m_cursors->m_txc_alt_blocks
 
 typedef struct mdb_rflags
 {
@@ -105,6 +108,7 @@ typedef struct mdb_rflags
   bool m_rf_output_blacklist;
   bool m_rf_txs;
   bool m_rf_txs_pruned;
+  bool m_rf_alt_blocks;
   bool m_rf_txs_prunable;
   bool m_rf_txs_prunable_hash;
   bool m_rf_txs_prunable_tip;
@@ -291,6 +295,11 @@ public:
   virtual bool prune_blockchain(uint32_t pruning_seed = 0);
   virtual bool update_pruning();
   virtual bool check_pruning();
+  virtual void add_alt_block(const crypto::hash &blkid, const cryptonote::alt_block_data_t &data, const cryptonote::blobdata &blob);
+  virtual bool get_alt_block(const crypto::hash &blkid, alt_block_data_t *data, cryptonote::blobdata *blob);
+  virtual void remove_alt_block(const crypto::hash &blkid);
+  virtual uint64_t get_alt_block_count();
+  virtual void drop_alt_blocks();
 
   virtual bool for_all_txpool_txes(std::function<bool(const crypto::hash&, const txpool_tx_meta_t&, const cryptonote::blobdata*)> f, bool include_blob = false, bool include_unrelayed_txes = true) const;
 
@@ -299,7 +308,7 @@ public:
   virtual bool for_all_transactions(std::function<bool(const crypto::hash&, const cryptonote::transaction&)>, bool pruned) const;
   virtual bool for_all_outputs(std::function<bool(uint64_t amount, const crypto::hash &tx_hash, uint64_t height, size_t tx_idx)> f) const;
   virtual bool for_all_outputs(uint64_t amount, const std::function<bool(uint64_t height)> &f) const;
-
+  virtual bool for_all_alt_blocks(std::function<bool(const crypto::hash &blkid, const alt_block_data_t &data, const cryptonote::blobdata *blob)> f, bool include_blob = false) const;
   virtual uint64_t add_block( const block& blk
                             , size_t block_weight
                             , uint64_t long_term_block_weight
@@ -455,6 +464,8 @@ private:
 
   MDB_dbi m_txpool_meta;
   MDB_dbi m_txpool_blob;
+
+  MDB_dbi m_alt_blocks;
 
   MDB_dbi m_hf_starting_heights;
   MDB_dbi m_hf_versions;

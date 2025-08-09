@@ -31,6 +31,7 @@ static constexpr size_t MAX_ARTICLE_TITLE_LEN = 128;
 static constexpr size_t MAX_ARTICLE_CONTENT_LEN = 2048;
 static constexpr size_t MAX_ARTICLE_PUBLISHER_LEN = 64;
 
+static constexpr uint64_t ARTICLE_POSTING_FEE = 5000 * COIN; // 5000 ANTD
 
 namespace cryptonote {
 
