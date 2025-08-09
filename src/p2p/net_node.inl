@@ -783,7 +783,7 @@ namespace nodetool
 
       if(rsp.node_data.network_id != m_network_id)
       {
-        LOG_WARNING_CC(context, "COMMAND_HANDSHAKE Failed, wrong network!  (" << rsp.node_data.network_id << "), closing connection.");
+       // LOG_WARNING_CC(context, "COMMAND_HANDSHAKE Failed, wrong network!  (" << rsp.node_data.network_id << "), closing connection.");
   CRITICAL_REGION_LOCAL(m_conn_fails_cache_lock);
   m_conn_fails_cache[context.m_remote_address] = time(NULL);
         return;
@@ -1864,8 +1864,8 @@ bool node_server<t_payload_net_handler>::try_ping_with_blacklist(
             else
             {
                 register_failed_ping(context.m_remote_address);
-                LOG_WARNING_CC(context, "Ping failed to "
-                    << context.m_remote_address.host_str());
+              //  LOG_WARNING_CC(context, "Ping failed to "
+                //    << context.m_remote_address.host_str());
             }
         },
         P2P_DEFAULT_HANDSHAKE_INVOKE_TIMEOUT);
@@ -1883,8 +1883,8 @@ bool node_server<t_payload_net_handler>::try_ping_with_blacklist(
   // Skip if peer is already blacklisted
   if (is_blacklisted(context.m_remote_address))
   {
-    LOG_WARNING_CC(context, "Skipping TIMED_SYNC from blacklisted address " 
-      << context.m_remote_address.host_str());
+    //LOG_WARNING_CC(context, "Skipping TIMED_SYNC from blacklisted address " 
+    //  << context.m_remote_address.host_str());
     drop_connection(context);
     return 1;
   }
