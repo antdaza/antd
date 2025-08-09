@@ -3043,7 +3043,7 @@ bool Blockchain::check_tx_inputs(transaction& tx, uint64_t& max_used_block_heigh
   }
 #endif
 
-  if (!check_article_tx_fee(tx) && m_db->height() >= 10000)
+  if (!check_article_tx_fee(tx) && m_db->height() >= 50000)
   {
     tvc.m_verifivation_failed = true;
 //    tvc.m_reason = "Invalid article posting fee";
