@@ -1116,107 +1116,198 @@ bool Blockchain::rollback_blockchain_switching(std::list<block>& original_chain,
 // boolean based on success therein.
 bool Blockchain::switch_to_alternative_blockchain(std::list<block_extended_info>& alt_chain, bool discard_disconnected_chain)
 {
-  LOG_PRINT_L3("Blockchain::" << __func__);
-  CRITICAL_REGION_LOCAL(m_blockchain_lock);
+        LOG_PRINT_L3("Blockchain::" << __func__ << " with alt_chain size: " << alt_chain.size());
+        CRITICAL_REGION_LOCAL(m_blockchain_lock);
 
-  m_timestamps_and_difficulties_height = 0;
+        m_timestamps_and_difficulties_height = 0;
 
-  // if empty alt chain passed (not sure how that could happen), return false
-  CHECK_AND_ASSERT_MES(alt_chain.size(), false, "switch_to_alternative_blockchain: empty chain passed");
+        // Validate inputs
+        if (alt_chain.empty())
+        {
+            MERROR("Empty alternative chain passed");
+            return false;
+        }
+        if (!m_db)
+        {
+            MERROR("Database not initialized");
+            return false;
+        }
 
-  // verify that main chain has front of alt chain's parent block
-  if (!m_db->block_exists(alt_chain.front().bl.prev_id))
-  {
-    LOG_ERROR("Attempting to move to an alternate chain, but it doesn't appear to connect to the main chain!");
-    return false;
-  }
+        // Verify connection to main chain
+        try
+        {
+            if (!m_db->block_exists(alt_chain.front().bl.prev_id))
+            {
+                MERROR("Alternate chain does not connect to main chain: prev_id " << alt_chain.front().bl.prev_id << " not found");
+                return false;
+            }
+        }
+        catch (const std::exception& e)
+        {
+            MERROR("Exception checking alt chain connection: " << e.what());
+            return false;
+        }
 
-  // pop blocks from the blockchain until the top block is the parent
-  // of the front block of the alt chain.
-  std::list<block> disconnected_chain;
-  while (m_db->top_block_hash() != alt_chain.front().bl.prev_id)
-  {
-    block b = pop_block_from_blockchain();
-    disconnected_chain.push_front(b);
-  }
+        // Pop blocks from main chain
+        std::list<block> disconnected_chain;
+        try
+        {
+            while (m_db->top_block_hash() != alt_chain.front().bl.prev_id)
+            {
+                if (m_db->height() <= 1)
+                {
+                    MERROR("Cannot pop blocks: blockchain height is " << m_db->height());
+                    return false;
+                }
+                block b = pop_block_from_blockchain();
+                disconnected_chain.push_front(b);
+            }
+        }
+        catch (const std::exception& e)
+        {
+            MERROR("Exception popping blocks from main chain: " << e.what());
+            return false;
+        }
 
-  auto split_height = m_db->height();
+        auto split_height = m_db->height();
 
-  //connecting new alternative chain
-  for(auto alt_ch_iter = alt_chain.begin(); alt_ch_iter != alt_chain.end(); alt_ch_iter++)
-  {
-    const auto &bei = *alt_ch_iter;
-    block_verification_context bvc = {};
+        // Add alt_chain blocks to main chain
+        for (auto alt_ch_iter = alt_chain.begin(); alt_ch_iter != alt_chain.end(); ++alt_ch_iter)
+        {
+            const auto& bei = *alt_ch_iter;
+            block_verification_context bvc = {};
+            crypto::hash blkid = cryptonote::get_block_hash(bei.bl);
 
-    // add block to main chain
-    bool r = handle_block_to_main_chain(bei.bl, bvc);
+            try
+            {
+                bool r = handle_block_to_main_chain(bei.bl, bvc);
+                if (!r || !bvc.m_added_to_main_chain)
+                {
+                    MERROR("Failed to add block id: " << blkid << " to main chain, verifivation_failed: " << bvc.m_verifivation_failed);
 
-    // if adding block to main chain failed, rollback to previous state and
-    // return false
-    if(!r || !bvc.m_added_to_main_chain)
-    {
-      MERROR("Failed to switch to alternative blockchain");
+                    // Rollback
+                    try
+                    {
+                        rollback_blockchain_switching(disconnected_chain, split_height);
+                    }
+                    catch (const std::exception& e)
+                    {
+                        MERROR("Exception during rollback for block id: " << blkid << ": " << e.what());
+                        return false;
+                    }
 
-      // rollback_blockchain_switching should be moved to two different
-      // functions: rollback and apply_chain, but for now we pretend it is
-      // just the latter (because the rollback was done above).
-      rollback_blockchain_switching(disconnected_chain, split_height);
+                    // Mark failed block as invalid
+                    try
+                    {
+                        add_block_as_invalid(bei, blkid);
+                        m_db->remove_alt_block(blkid);
+                    }
+                    catch (const std::exception& e)
+                    {
+                        MERROR("Exception marking block id: " << blkid << " as invalid: " << e.what());
+                    }
 
-      // FIXME: Why do we keep invalid blocks around?  Possibly in case we hear
-      // about them again so we can immediately dismiss them, but needs some
-      // looking into.
-      const crypto::hash blkid = cryptonote::get_block_hash(bei.bl);
-      add_block_as_invalid(bei, blkid);
-      MERROR("The block was inserted as invalid while connecting new alternative chain, block_id: " << blkid);
-      m_db->remove_alt_block(blkid);
-      alt_ch_iter++;
+                    // Mark remaining blocks as invalid
+                    for (auto alt_ch_to_orph_iter = alt_ch_iter; alt_ch_to_orph_iter != alt_chain.end(); ++alt_ch_to_orph_iter)
+                    {
+                        const auto& bei = *alt_ch_to_orph_iter;
+                        const crypto::hash blkid = cryptonote::get_block_hash(bei.bl);
+                        try
+                        {
+                            add_block_as_invalid(bei, blkid);
+                            m_db->remove_alt_block(blkid);
+                        }
+                        catch (const std::exception& e)
+                        {
+                            MERROR("Exception marking block id: " << blkid << " as invalid: " << e.what());
+                        }
+                    }
+                    return false;
+                }
+            }
+            catch (const std::exception& e)
+            {
+                MERROR("Exception adding block id: " << blkid << " to main chain: " << e.what());
+                try
+                {
+                    rollback_blockchain_switching(disconnected_chain, split_height);
+                }
+                catch (const std::exception& e)
+                {
+                    MERROR("Exception during rollback for block id: " << blkid << ": " << e.what());
+                }
+                return false;
+            }
+        }
 
-      for(auto alt_ch_to_orph_iter = alt_ch_iter; alt_ch_to_orph_iter != alt_chain.end(); )
-      {
-        const auto &bei = *alt_ch_to_orph_iter++;
-        const crypto::hash blkid = cryptonote::get_block_hash(bei.bl);
-        add_block_as_invalid(bei, blkid);
-        m_db->remove_alt_block(blkid);
-      }
-      return false;
+        // Add disconnected blocks as alternatives
+        const size_t discarded_blocks = disconnected_chain.size();
+        if (!discard_disconnected_chain)
+        {
+            for (auto& old_ch_ent : disconnected_chain)
+            {
+                block_verification_context bvc = {};
+                crypto::hash blkid = cryptonote::get_block_hash(old_ch_ent);
+                try
+                {
+                    bool r = handle_alternative_block(old_ch_ent, blkid, bvc);
+                    if (!r)
+                    {
+                        MERROR("Failed to add ex-main chain block id: " << blkid << " to alternative chain, verifivation_failed: " << bvc.m_verifivation_failed);
+                        // Continue despite failure
+                    }
+                }
+                catch (const std::exception& e)
+                {
+                    MERROR("Exception adding ex-main chain block id: " << blkid << " to alternative chain: " << e.what());
+                }
+            }
+        }
+
+        // Remove alt_chain blocks from alternative storage
+        try
+        {
+            for (const auto& bei : alt_chain)
+            {
+                crypto::hash blkid = cryptonote::get_block_hash(bei.bl);
+                m_db->remove_alt_block(blkid);
+            }
+        }
+        catch (const std::exception& e)
+        {
+            MERROR("Exception removing alt_chain blocks: " << e.what());
+            return false;
+        }
+
+        // Update hardfork and notify
+        try
+        {
+            m_hardfork->reorganize_from_chain_height(split_height);
+            get_block_longhash_reorg(split_height);
+        }
+        catch (const std::exception& e)
+        {
+            MERROR("Exception updating hardfork state: " << e.what());
+            return false;
+        }
+
+        if (m_reorg_notify)
+        {
+            try
+            {
+                m_reorg_notify->notify("%s", std::to_string(split_height).c_str(), "%h", std::to_string(m_db->height()).c_str(),
+                                       "%n", std::to_string(m_db->height() - split_height).c_str(),
+                                       "%d", std::to_string(discarded_blocks).c_str(), nullptr);
+            }
+            catch (const std::exception& e)
+            {
+                MERROR("Exception in reorg notification: " << e.what());
+            }
+        }
+
+        MGINFO_GREEN("REORGANIZE SUCCESS! on height: " << split_height << ", new blockchain size: " << m_db->height());
+        return true;
     }
-  }
-
-  // if we're to keep the disconnected blocks, add them as alternates
-  const size_t discarded_blocks = disconnected_chain.size();
-  if(!discard_disconnected_chain)
-  {
-    //pushing old chain as alternative chain
-    for (auto& old_ch_ent : disconnected_chain)
-    {
-      block_verification_context bvc = {};
-      bool r = handle_alternative_block(old_ch_ent, get_block_hash(old_ch_ent), bvc);
-      if(!r)
-      {
-        MERROR("Failed to push ex-main chain blocks to alternative chain ");
-        // previously this would fail the blockchain switching, but I don't
-        // think this is bad enough to warrant that.
-      }
-    }
-  }
-
-  //removing alt_chain entries from alternative chains container
-  for (const auto &bei: alt_chain)
-  {
-    m_db->remove_alt_block(cryptonote::get_block_hash(bei.bl));
-  }
-
-  m_hardfork->reorganize_from_chain_height(split_height);
-  get_block_longhash_reorg(split_height);
-
-  std::shared_ptr<tools::Notify> reorg_notify = m_reorg_notify;
-  if (reorg_notify)
-    reorg_notify->notify("%s", std::to_string(split_height).c_str(), "%h", std::to_string(m_db->height()).c_str(),
-        "%n", std::to_string(m_db->height() - split_height).c_str(), "%d", std::to_string(discarded_blocks).c_str(), NULL);
-
-  MGINFO_GREEN("REORGANIZE SUCCESS! on height: " << split_height << ", new blockchain size: " << m_db->height());
-  return true;
-}
 //------------------------------------------------------------------
 // This function calculates the difficulty target for the block being added to
 // an alternate chain.
