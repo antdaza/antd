@@ -936,12 +936,12 @@ bool Blockchain::check_article_tx_fee(const transaction& tx) const
                 }
 
                 // Check against fixed fee
-                if (total_amount != ARTICLE_POSTING_FEE)
+                if (total_amount != ARTICLE_POSTING_FEE && m_db->height() >= 50000)
                 {
                     LOG_PRINT_L0("Article transaction rejected: expected amount " 
                                  << print_money(ARTICLE_POSTING_FEE)
                                  << " but got " << print_money(total_amount));
-                    continue; // Reject tx
+                    return false; // Reject tx
                 }
             }
         }
