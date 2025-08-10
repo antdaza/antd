@@ -913,6 +913,8 @@ namespace cryptonote
       */
      bool check_blockchain_pruning();
 
+    full_nodes::quorum_cop& get_quorum_cop() { return m_quorum_cop; }
+
    private:
 
      /**

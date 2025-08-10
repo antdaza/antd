@@ -61,6 +61,9 @@ namespace full_nodes
 
     void generate_uptime_proof_request(cryptonote::NOTIFY_UPTIME_PROOF::request& req) const;
 
+    // New method for self-deregistration on shutdown
+    bool generate_self_deregister_vote();
+
   private:
 
     cryptonote::core& m_core;

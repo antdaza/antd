@@ -26,13 +26,13 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include <string>
 #include "full_node_quorum_cop.h"
 #include "full_node_deregister.h"
 #include "full_node_list.h"
 #include "cryptonote_config.h"
 #include "cryptonote_core.h"
 #include "version.h"
-
 #include "common/antd_integration_test_hooks.h"
 
 #undef ANTD_DEFAULT_LOG_CATEGORY
@@ -62,86 +62,83 @@ namespace full_nodes
     }
   }
 
-  void quorum_cop::block_added(const cryptonote::block& block, const std::vector<cryptonote::transaction>& txs)
-  {
-    uint64_t const height        = cryptonote::get_block_height(block);
+void quorum_cop::block_added(const cryptonote::block& block, const std::vector<cryptonote::transaction>& txs)
+{
+  uint64_t const height = cryptonote::get_block_height(block);
 
-    if (m_core.get_hard_fork_version(height) < 9)
-      return;
+  if (m_core.get_hard_fork_version(height) < 9)
+    return;
 
-    crypto::public_key my_pubkey;
-    crypto::secret_key my_seckey;
-    if (!m_core.get_full_node_keys(my_pubkey, my_seckey))
-      return;
+  crypto::public_key my_pubkey;
+  crypto::secret_key my_seckey;
+  if (!m_core.get_full_node_keys(my_pubkey, my_seckey))
+    return;
 
-    time_t const now          = time(nullptr);
+  time_t const now = time(nullptr);
 #if defined(ANTD_ENABLE_INTEGRATION_TEST_HOOKS)
-    time_t const min_lifetime = 0;
+  time_t const min_lifetime = 0;
 #else
-    time_t const min_lifetime = 60 * 60 * 2;
+  time_t const min_lifetime = 60 * 60 * 2;
 #endif
-    bool alive_for_min_time   = (now - m_core.get_start_time()) >= min_lifetime;
-    if (!alive_for_min_time)
+  bool alive_for_min_time = (now - m_core.get_start_time()) >= min_lifetime;
+  if (!alive_for_min_time)
+    return;
+
+  uint64_t const latest_height = std::max(m_core.get_current_blockchain_height(), m_core.get_target_blockchain_height());
+
+  if (latest_height < full_nodes::deregister_vote::VOTE_LIFETIME_BY_HEIGHT)
+    return;
+
+  uint64_t const execute_justice_from_height = latest_height - full_nodes::deregister_vote::VOTE_LIFETIME_BY_HEIGHT;
+  if (height < execute_justice_from_height)
+    return;
+
+  if (m_last_height < execute_justice_from_height)
+    m_last_height = execute_justice_from_height;
+
+  for (; m_last_height < (height - REORG_SAFETY_BUFFER_IN_BLOCKS); m_last_height++)
+  {
+    if (m_core.get_hard_fork_version(m_last_height) < 9)
+      continue;
+
+    const std::shared_ptr<const quorum_state> state = m_core.get_quorum_state(m_last_height);
+    if (!state)
     {
-      return;
+      LOG_ERROR("Quorum state for height: " << m_last_height << " was not cached in daemon!");
+      continue;
     }
 
-    uint64_t const latest_height = std::max(m_core.get_current_blockchain_height(), m_core.get_target_blockchain_height());
+    auto it = std::find(state->quorum_nodes.begin(), state->quorum_nodes.end(), my_pubkey);
+    if (it == state->quorum_nodes.end())
+      continue;
 
-    if (latest_height < full_nodes::deregister_vote::VOTE_LIFETIME_BY_HEIGHT)
-      return;
-
-    uint64_t const execute_justice_from_height = latest_height - full_nodes::deregister_vote::VOTE_LIFETIME_BY_HEIGHT;
-    if (height < execute_justice_from_height)
-      return;
-
-    if (m_last_height < execute_justice_from_height)
-      m_last_height = execute_justice_from_height;
-
-
-    for (;m_last_height < (height - REORG_SAFETY_BUFFER_IN_BLOCKS); m_last_height++)
+    size_t my_index_in_quorum = it - state->quorum_nodes.begin();
+    for (size_t node_index = 0; node_index < state->nodes_to_test.size(); ++node_index)
     {
-      if (m_core.get_hard_fork_version(m_last_height) < 9)
+      const crypto::public_key &node_key = state->nodes_to_test[node_index];
+
+      CRITICAL_REGION_LOCAL(m_lock);
+      auto proof_it = m_uptime_proof_seen.find(node_key);
+      bool vote_off_node = (proof_it == m_uptime_proof_seen.end() ||
+                           proof_it->second < static_cast<uint64_t>(now) - UPTIME_PROOF_MAX_TIME_IN_SECONDS);
+
+      if (!vote_off_node)
         continue;
 
-      const std::shared_ptr<const quorum_state> state = m_core.get_quorum_state(m_last_height);
-      if (!state)
+      full_nodes::deregister_vote vote = {};
+      vote.block_height = m_last_height;
+      vote.full_node_index = node_index;
+      vote.voters_quorum_index = my_index_in_quorum;
+      vote.signature = full_nodes::deregister_vote::sign_vote(vote.block_height, vote.full_node_index, my_pubkey, my_seckey);
+
+      cryptonote::vote_verification_context vvc = {};
+      if (!m_core.add_deregister_vote(vote, vvc))
       {
-        // TODO(antd): Fatal error
-        LOG_ERROR("Quorum state for height: " << m_last_height << "was not cached in daemon!");
-        continue;
-      }
-
-      auto it = std::find(state->quorum_nodes.begin(), state->quorum_nodes.end(), my_pubkey);
-      if (it == state->quorum_nodes.end())
-        continue;
-
-      size_t my_index_in_quorum = it - state->quorum_nodes.begin();
-      for (size_t node_index = 0; node_index < state->nodes_to_test.size(); ++node_index)
-      {
-        const crypto::public_key &node_key = state->nodes_to_test[node_index];
-
-        CRITICAL_REGION_LOCAL(m_lock);
-        bool vote_off_node = (m_uptime_proof_seen.find(node_key) == m_uptime_proof_seen.end());
-
-        if (!vote_off_node)
-          continue;
-
-        full_nodes::deregister_vote vote = {};
-        vote.block_height        = m_last_height;
-        vote.full_node_index  = node_index;
-        vote.voters_quorum_index = my_index_in_quorum;
-        vote.signature           = full_nodes::deregister_vote::sign_vote(vote.block_height, vote.full_node_index, my_pubkey, my_seckey);
-
-        cryptonote::vote_verification_context vvc = {};
-        if (!m_core.add_deregister_vote(vote, vvc))
-        {
-          LOG_ERROR("Failed to add deregister vote reason: " << print_vote_verification_context(vvc, &vote));
-        }
+        LOG_ERROR("Failed to add deregister vote reason: " << print_vote_verification_context(vvc, &vote));
       }
     }
   }
-
+}
   static crypto::hash make_hash(crypto::public_key const &pubkey, uint64_t timestamp)
   {
     char buf[44] = "SUP"; // Meaningless magic bytes
@@ -244,5 +241,81 @@ namespace full_nodes
     }
 
     return (*it).second;
+  }
+
+bool quorum_cop::generate_self_deregister_vote()
+{
+    // Get current blockchain height
+    uint64_t height = m_core.get_current_blockchain_height();
+    
+    // Skip if hard fork version is less than 9
+    if (m_core.get_hard_fork_version(height) < 9)
+    {
+      LOG_ERROR("Cannot generate deregister vote: hard fork version < 9 at height " << height);
+      return false;
+    }
+
+    // Get node's public and secret keys
+    crypto::public_key my_pubkey;
+    crypto::secret_key my_seckey;
+    if (!m_core.get_full_node_keys(my_pubkey, my_seckey))
+    {
+      LOG_ERROR("Failed to retrieve full node keys for deregistration");
+      return false;
+    }
+
+    // Get quorum state for the current height
+    const std::shared_ptr<const quorum_state> state = m_core.get_quorum_state(height);
+    if (!state)
+    {
+      LOG_ERROR("Quorum state for height " << height << " not cached in daemon!");
+      return false;
+    }
+
+    // Check if this node is in the quorum
+    auto it = std::find(state->quorum_nodes.begin(), state->quorum_nodes.end(), my_pubkey);
+    if (it == state->quorum_nodes.end())
+    {
+      MINFO("Node is not in quorum at height " + std::to_string(height) + ", no deregistration needed");
+      return true; // Not in quorum, so no need to deregister
+    }
+
+    size_t my_index_in_quorum = it - state->quorum_nodes.begin();
+
+    // Find the node's index in the nodes_to_test list
+    size_t node_index = 0;
+    bool found = false;
+    for (; node_index < state->nodes_to_test.size(); ++node_index)
+    {
+      if (state->nodes_to_test[node_index] == my_pubkey)
+      {
+        found = true;
+        break;
+      }
+    }
+
+    if (!found)
+    {
+      LOG_ERROR("Node not found in nodes_to_test list at height " << height);
+      return false;
+    }
+
+    // Create and sign the deregistration vote
+    full_nodes::deregister_vote vote = {};
+    vote.block_height = height; // Use current height
+    vote.full_node_index = node_index;
+    vote.voters_quorum_index = my_index_in_quorum;
+    vote.signature = full_nodes::deregister_vote::sign_vote(vote.block_height, vote.full_node_index, my_pubkey, my_seckey);
+
+    // Submit the vote
+    cryptonote::vote_verification_context vvc = {};
+    if (!m_core.add_deregister_vote(vote, vvc))
+    {
+      LOG_ERROR("Failed to add self-deregister vote: " << print_vote_verification_context(vvc, &vote));
+      return false;
+    }
+
+    MINFO("Successfully generated and submitted self-deregister vote for node at height " + std::to_string(height));
+    return true;
   }
 }

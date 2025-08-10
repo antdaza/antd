@@ -44,9 +44,9 @@
 #include "daemon/protocol.h"
 #include "daemon/rpc.h"
 #include "daemon/command_server.h"
-#include "daemon/command_server.h"
 #include "daemon/command_line_args.h"
 #include "version.h"
+#include "cryptonote_core/full_node_quorum_cop.h"
 
 using namespace epee;
 
@@ -217,11 +217,27 @@ void t_daemon::stop()
   {
     throw std::runtime_error{"Can't stop stopped daemon"};
   }
+
+  crypto::public_key pubkey;
+  crypto::secret_key seckey;
+  if (mp_internals->core.get().get_full_node_keys(pubkey, seckey))
+  {
+    full_nodes::quorum_cop& quorum = mp_internals->core.get().get_quorum_cop();
+    if (!quorum.generate_self_deregister_vote())
+    {
+      MERROR("Failed to generate self-deregister vote during daemon shutdown");
+    }
+    else
+    {
+      MINFO("Initiated self-deregistration vote for full node on daemon shutdown");
+    }
+  }
+
   mp_internals->p2p.stop();
   for(auto& rpc : mp_internals->rpcs)
     rpc->stop();
 
-  mp_internals.reset(nullptr); // Ensure resources are cleaned up before we return
+  mp_internals.reset(nullptr);
 }
 
 void t_daemon::stop_p2p()

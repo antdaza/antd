@@ -267,6 +267,7 @@ namespace cryptonote
     network_version_10_bulletproofs, // Bulletproofs, Full Node Grace Registration Period, Batched Control
     network_version_11_infinite_staking,
     network_version_12,
+    network_version_13,
 
     network_version_count,
   };

@@ -39,7 +39,7 @@
 #include <boost/interprocess/detail/atomic.hpp>
 #include <list>
 #include <ctime>
-
+#include "misc_log_ex.h"
 #include "cryptonote_basic/cryptonote_format_utils.h"
 #include "profile_tools.h"
 #include "net/network_throttle-detail.hpp"
@@ -876,43 +876,53 @@ else if (context.m_remote_address.get_type_id() == epee::net_utils::ipv6_network
   template<class t_core>
   int t_cryptonote_protocol_handler<t_core>::handle_notify_new_deregister_vote(int command, NOTIFY_NEW_DEREGISTER_VOTE::request& arg, cryptonote_connection_context& context)
   {
-    MLOG_P2P_MESSAGE("Received NOTIFY_NEW_DEREGISTER_VOTE (" << arg.votes.size() << " txes)");
+  MLOG_P2P_MESSAGE("Received NOTIFY_NEW_DEREGISTER_VOTE (" << arg.votes.size() << " votes)");
 
-    if(context.m_state != cryptonote_connection_context::state_normal)
-      return 1;
+  if (context.m_state != cryptonote_connection_context::state_normal)
+  {
+    LOG_DEBUG_CC(context, "Ignoring deregister vote: connection not in normal state");
+    return 1;
+  }
 
-    if(!is_synchronized())
+  if (!is_synchronized())
+  {
+    LOG_DEBUG_CC(context, "Received new deregister vote while syncing, ignored");
+    return 1;
+  }
+
+  size_t valid_votes = 0;
+  for (auto it = arg.votes.begin(); it != arg.votes.end();)
+  {
+    cryptonote::vote_verification_context vvc = {};
+    if (m_core.add_deregister_vote(*it, vvc))
     {
-      LOG_DEBUG_CC(context, "Received new deregister vote while syncing, ignored");
-      return 1;
-    }
-
-    for(auto it = arg.votes.begin(); it != arg.votes.end();)
-    {
-      cryptonote::vote_verification_context vvc = {};
-      m_core.add_deregister_vote(*it, vvc);
-
-      if (vvc.m_verification_failed)
-      {
-        LOG_PRINT_CCONTEXT_L1("Deregister vote verification failed, dropping connection");
-        drop_connection(context, false /*add_fail*/, false /*flush_all_spans i.e. delete cached block data from this peer*/);
-        return 1;
-      }
-
       if (vvc.m_added_to_pool)
       {
-        it++;
+        LOG_DEBUG_CC(context, "Deregister vote added to pool for height " << it->block_height << ", node index " << it->full_node_index);
+        valid_votes++;
+        ++it;
       }
       else
       {
+        LOG_DEBUG_CC(context, "Deregister vote not added to pool for height " << it->block_height << ", node index " << it->full_node_index);
         it = arg.votes.erase(it);
       }
     }
-
-    if (arg.votes.size())
+    else
     {
-      relay_deregister_votes(arg, context);
+      LOG_ERROR_CC(context, "Deregister vote verification failed for height " << it->block_height << ", node index " << it->full_node_index << ": " << print_vote_verification_context(vvc));
+      it = arg.votes.erase(it);
     }
+  }
+
+  if (valid_votes > 0)
+  {
+    LOG_DEBUG_CC(context, "Relaying " << valid_votes << " valid deregister votes");
+    if (!relay_deregister_votes(arg, context))
+    {
+      LOG_DEBUG_CC(context, "Failed to relay some or all deregister votes");
+    }
+  }
 
     return 1;
   }
@@ -2200,12 +2210,30 @@ skip:
 
     return true;
   }
-  //------------------------------------------------------------------------------------------------------------------------
+  //----------------------------------------------------------------------------------------------------------------
   template<class t_core>
   bool t_cryptonote_protocol_handler<t_core>::relay_deregister_votes(NOTIFY_NEW_DEREGISTER_VOTE::request& arg, cryptonote_connection_context& exclude_context)
   {
-    bool result = relay_post_notify<NOTIFY_NEW_DEREGISTER_VOTE>(arg, exclude_context);
-    return result;
+  MINFO("Relaying " << arg.votes.size() << " deregister votes");
+
+  // Serialize the request
+  std::string msg_buff;
+  if (!epee::serialization::store_t_to_binary(arg, msg_buff))
+  {
+    MERROR("Failed to serialize NOTIFY_NEW_DEREGISTER_VOTE for relaying");
+    return false;
+  }
+
+  // Relay to all peers except the sender
+  epee::span<const uint8_t> data_buff(reinterpret_cast<const uint8_t*>(msg_buff.data()), msg_buff.size());
+  bool relayed = m_p2p->relay_notify_to_all(NOTIFY_NEW_DEREGISTER_VOTE::ID, data_buff, exclude_context);
+
+  if (!relayed)
+  {
+    MDEBUG("No peers available to relay NOTIFY_NEW_DEREGISTER_VOTE");
+  }
+
+   return relayed;
   }
   //------------------------------------------------------------------------------------------------------------------------
   template<class t_core>

@@ -117,6 +117,7 @@ namespace cryptonote
     std::string get_peers_overview() const;
     std::pair<uint32_t, uint32_t> get_next_needed_pruning_stripe() const;
     bool needs_new_sync_connections() const;
+    bool relay_deregister_votes(NOTIFY_NEW_DEREGISTER_VOTE::request& arg, cryptonote_connection_context& context);
   private:
     //----------------- commands handlers ----------------------------------------------
     int handle_notify_new_block(int command, NOTIFY_NEW_BLOCK::request& arg, cryptonote_connection_context& context);
@@ -133,7 +134,6 @@ namespace cryptonote
     //----------------- i_bc_protocol_layout ---------------------------------------
     virtual bool relay_block(NOTIFY_NEW_BLOCK::request& arg, cryptonote_connection_context& exclude_context);
     virtual bool relay_transactions(NOTIFY_NEW_TRANSACTIONS::request& arg, cryptonote_connection_context& exclude_context);
-    virtual bool relay_deregister_votes(NOTIFY_NEW_DEREGISTER_VOTE::request& arg, cryptonote_connection_context& exclude_context);
     //----------------- uptime proof ---------------------------------------
     virtual bool relay_uptime_proof(NOTIFY_UPTIME_PROOF::request& arg, cryptonote_connection_context& exclude_context);
     //----------------------------------------------------------------------------------
