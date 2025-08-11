@@ -5719,63 +5719,88 @@ bool simple_wallet::locked_transfer(const std::vector<std::string> &args_)
   return true;
 }
 //-------------------------------------------------------
+static cryptonote::article_metadata set_article_to_tx_extra(const std::string& title, const std::string& content, const std::string& publisher,
+                                                           const boost::optional<cryptonote::calculator_metadata>& calc,
+                                                           const boost::optional<cryptonote::ballot_metadata>& ballot) {
+    cryptonote::article_metadata result;
+    message_writer() << "Debug: set_article_to_tx_extra: Starting";
 
-article_metadata set_article_to_tx_extra(const std::string& title, const std::string& content, const std::string& publisher) {
-  article_metadata result;
-  message_writer() << tr("Debug: set_article_to_tx_extra: Starting");
-
-  if (title.size() > 128 || content.size() > 4000 || publisher.size() > 64) {
-    result.error = "Metadata too large";
-    return result;
-  }
-  if (title.empty() || content.empty()) {
-    result.error = "Missing title or content";
-    return result;
-  }
-  tx_extra_article_info article_info = {title, content, publisher.empty() ? "Unknown" : publisher};
-
-  //message_writer() << tr("Debug: set_article_to_tx_extra: Manually serializing");
-  std::vector<uint8_t> serialized;
-  try {
-    size_t total_size = 1 + article_info.title.size() + 2 + article_info.content.size() + 1 + article_info.publisher.size();
-    if (total_size + 4 > TX_EXTRA_NONCE_MAX_COUNT - 2) { // Account for ARTC (4), tag (1), length (1)
-      result.error = "Serialized data too large: " + std::to_string(total_size + 4) + " bytes, max " + std::to_string(TX_EXTRA_NONCE_MAX_COUNT - 2);
-    //  message_writer() << tr("Debug: set_article_to_tx_extra: ") << result.error;
-      return result;
+    if (title.size() > 128 || content.size() > 4000 || publisher.size() > 64) {
+        result.error = "Metadata too large";
+        return result;
+    }
+    if (title.empty() || content.empty()) {
+        result.error = "Missing title or content";
+        return result;
     }
 
-    serialized.reserve(total_size);
-    serialized.push_back(static_cast<uint8_t>(article_info.title.size()));
-    serialized.insert(serialized.end(), article_info.title.begin(), article_info.title.end());
-    serialized.push_back(static_cast<uint8_t>(article_info.content.size() >> 8)); // High byte
-    serialized.push_back(static_cast<uint8_t>(article_info.content.size() & 0xFF)); // Low byte
-    serialized.insert(serialized.end(), article_info.content.begin(), article_info.content.end());
-    serialized.push_back(static_cast<uint8_t>(article_info.publisher.size()));
-    serialized.insert(serialized.end(), article_info.publisher.begin(), article_info.publisher.end());
+    result.title = title;
+    result.content = content;
+    result.publisher = publisher.empty() ? "Unknown" : publisher;
+    result.calc = calc;
+    result.ballot = ballot;
 
-    result.serialized_blob = {'A', 'R', 'T', 'C'};
-    result.serialized_blob.insert(result.serialized_blob.end(), serialized.begin(), serialized.end());
-    //message_writer() << tr("Debug: set_article_to_tx_extra: Serialization completed, size: ") << result.serialized_blob.size();
-    //message_writer() << tr("Debug: set_article_to_tx_extra: Serialized data (hex): ") << epee::string_tools::buff_to_hex_nodelim(result.serialized_blob);
-  } catch (const std::exception& e) {
-    result.error = "Serialization exception: " + std::string(e.what());
-    //message_writer() << tr("Debug: set_article_to_tx_extra: ") << result.error;
+    std::vector<uint8_t> serialized;
+    try {
+        size_t total_size = 1 + title.size() + 2 + content.size() + 1 + result.publisher.size();
+        if (calc) {
+            std::vector<uint8_t> calc_data;
+            epee::serialization::store_t_to_binary(*calc, calc_data);
+            total_size += 1 + calc_data.size();
+        }
+        if (ballot) {
+            std::vector<uint8_t> ballot_data;
+            epee::serialization::store_t_to_binary(*ballot, ballot_data);
+            total_size += 1 + ballot_data.size();
+        }
+
+        if (total_size + 4 > cryptonote::TX_EXTRA_NONCE_MAX_COUNT - 2) {
+            result.error = "Serialized data too large: " + std::to_string(total_size + 4) + " bytes, max " + std::to_string(cryptonote::TX_EXTRA_NONCE_MAX_COUNT - 2);
+            return result;
+        }
+
+        serialized.reserve(total_size);
+        serialized.push_back(static_cast<uint8_t>(cryptonote::metadata_type_t::ARTICLE));
+        serialized.push_back(static_cast<uint8_t>(title.size()));
+        serialized.insert(serialized.end(), title.begin(), title.end());
+        serialized.push_back(static_cast<uint8_t>(content.size() >> 8));
+        serialized.push_back(static_cast<uint8_t>(content.size() & 0xFF));
+        serialized.insert(serialized.end(), content.begin(), content.end());
+        serialized.push_back(static_cast<uint8_t>(result.publisher.size()));
+        serialized.insert(serialized.end(), result.publisher.begin(), result.publisher.end());
+
+        if (calc) {
+            serialized.push_back(static_cast<uint8_t>(cryptonote::metadata_type_t::CALCULATOR));
+            std::vector<uint8_t> calc_data;
+            epee::serialization::store_t_to_binary(*calc, calc_data);
+            serialized.insert(serialized.end(), calc_data.begin(), calc_data.end());
+        }
+
+        if (ballot) {
+            serialized.push_back(static_cast<uint8_t>(cryptonote::metadata_type_t::BALLOT));
+            std::vector<uint8_t> ballot_data;
+            epee::serialization::store_t_to_binary(*ballot, ballot_data);
+            serialized.insert(serialized.end(), ballot_data.begin(), ballot_data.end());
+        }
+
+        result.serialized_blob = {'A', 'R', 'T', 'C'};
+        result.serialized_blob.insert(result.serialized_blob.end(), serialized.begin(), serialized.end());
+    } catch (const std::exception& e) {
+        result.error = "Serialization exception: " + std::string(e.what());
+        return result;
+    }
+
+    if (result.serialized_blob.empty()) {
+        result.error = "Serialized data empty";
+        return result;
+    }
+
+    cryptonote::cn_fast_hash(content.data(), content.size(), result.content_hash);
+    result.success = true;
     return result;
-  }
-
-  if (result.serialized_blob.empty()) {
-    result.error = "Serialized data empty";
-    //message_writer() << tr("Debug: set_article_to_tx_extra: ") << result.error;
-    return result;
-  }
-
- // message_writer() << tr("Debug: set_article_to_tx_extra: Computing content hash");
-  crypto::cn_fast_hash(content.data(), content.size(), result.content_hash);
-
-  result.success = true;
-  //message_writer() << tr("Debug: set_article_to_tx_extra: Completed");
-  return result;
 }
+
+
 static bool parse_article_metadata(const std::string& extra_nonce, article_metadata& result) {
   result = article_metadata();
   //message_writer() << tr("Debug: parse_article_metadata: Starting, extra_nonce size: ") << extra_nonce.size();
@@ -6072,13 +6097,18 @@ static void add_data_to_tx_extras(std::vector<uint8_t>& tx_extra, const std::str
   }
 }
 
-bool simple_wallet::article_main(int transfer_type, const std::vector<std::string>& args_, bool called_by_mms) {
+cryptonote::article_result simple_wallet::article_main(cryptonote::Transfer type, const std::vector<std::string>& args, bool called_by_mms,
+                                                      const boost::optional<cryptonote::calculator_metadata>& calc,
+                                                      const boost::optional<cryptonote::ballot_metadata>& ballot) {
+    cryptonote::article_result result = {false, {}, "", cryptonote::article_metadata()};
+
   //message_writer() << tr("Debug: Entering article_main, transfer_type: ") << transfer_type;
   if (!try_connect_to_daemon()) {
     //message_writer() << tr("Debug: Failed to connect to daemon");
     fail_msg_writer() << tr("Failed to connect to daemon");
     return false;
   }
+
   //message_writer() << tr("Debug: Connected to daemon");
   message_writer() << tr("Wallet network type: ") << (m_wallet->nettype() == cryptonote::MAINNET ? "mainnet" : m_wallet->nettype() == cryptonote::TESTNET ? "testnet" : "stagenet");
 
@@ -6157,21 +6187,23 @@ bool simple_wallet::article_main(int transfer_type, const std::vector<std::strin
     return false;
   }
 
-// Encode article metadata
-std::vector<uint8_t> extra;
-//message_writer() << tr("Debug: Before calling set_article_to_tx_extra");
-article_metadata article_meta = set_article_to_tx_extra(title, content, publisher);
-if (!article_meta.success) {
-  fail_msg_writer() << tr("Failed to process article: ") << article_meta.error;
-  return false;
-}
-
-//message_writer() << tr("Debug: Adding article metadata to tx_extra");
-blobdata extra_nonce(article_meta.serialized_blob.begin(), article_meta.serialized_blob.end());
-if (!add_extra_nonce_to_tx_extra(extra, extra_nonce)) {
-  fail_msg_writer() << tr("Failed to add article metadata to tx_extra");
-  return false;
-}
+    // Encode article metadata
+   std::vector<uint8_t> extra;
+   //message_writer() << tr("Debug: Before calling set_article_to_tx_extra");
+   article_metadata article_meta = set_article_to_tx_extra(title, content, publisher);
+   if (!article_meta.success) {
+        result.error = tr("Failed to process article: ") + article_meta.error;
+        fail_msg_writer() << result.error;
+        return result;
+   }
+    result.metadata = article_meta; // Store metadata in result
+  //message_writer() << tr("Debug: Adding article metadata to tx_extra");
+  blobdata extra_nonce(article_meta.serialized_blob.begin(), article_meta.serialized_blob.end());
+  if (!add_extra_nonce_to_tx_extra(extra, extra_nonce)) {
+        result.error = tr("Failed to add article metadata to tx_extra");
+        fail_msg_writer() << result.error;
+        return result;
+  }
   //message_writer() << tr("Debug: Article metadata encoded");
   message_writer() << tr("Warning: Article metadata will be stored unencrypted in the transaction's tx_extra field and visible on the blockchain.");
 
@@ -6574,7 +6606,26 @@ if (!add_extra_nonce_to_tx_extra(extra, extra_nonce)) {
     }
     else
     {
-      commit_or_save(ptx_vector, m_do_not_relay);
+    try {
+        commit_or_save(ptx_vector, m_do_not_relay);
+        for (const auto &ptx : ptx_vector) {
+            crypto::hash txid = cryptonote::get_transaction_hash(ptx.tx);
+            result.tx_hashes.push_back(epee::string_tools::pod_to_hex(txid));
+        }
+        result.success = true;
+        // message_writer() << tr("Debug: Article transaction(s) committed, tx_hashes: ") << boost::algorithm::join(result.tx_hashes, ", ");
+    } catch (const std::exception &e) {
+        result.error = std::string("Failed to commit transaction: ") + e.what();
+        handle_transfer_exception(std::current_exception(), m_wallet->is_trusted_daemon());
+        // message_writer() << tr("Debug: Exception in article_main: ") << result.error;
+        return result;
+    } catch (...) {
+        result.error = "Unknown error";
+        LOG_ERROR("Unknown error");
+        fail_msg_writer() << tr("unknown error");
+        return result;
+    }
+
     }
   }
   catch (const std::exception &e)
@@ -6589,7 +6640,7 @@ if (!add_extra_nonce_to_tx_extra(extra, extra_nonce)) {
     return false;
   }
 
-  return true;
+  return result;
 }
 //---------------------------------------------------------------------------------------------------
 bool simple_wallet::article_long(int transfer_type, const std::vector<std::string>& args_, bool called_by_mms)
@@ -7052,8 +7103,14 @@ std::vector<uint8_t> extra;
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::add_article(const std::vector<std::string> &args_)
 {
-  article_main(Transfer, args_, false);
-  return true;
+    article_result result = article_main(Transfer, args_, false);
+    if (result.success) {
+        success_msg_writer() << tr("Article added successfully. Transaction IDs: ") << boost::algorithm::join(result.tx_hashes, ", ");
+        success_msg_writer() << tr("Content hash: ") << epee::string_tools::pod_to_hex(result.metadata.content_hash);
+    } else {
+        fail_msg_writer() << tr("Failed to add article: ") << result.error;
+    }
+    return result.success;
 }
 //--------------------------------------------
 bool simple_wallet::add_article_long(const std::vector<std::string> &args_)

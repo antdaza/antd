@@ -61,6 +61,15 @@ constexpr const char MONERO_DONATION_ADDR[] = "44AFFq5kSiGBoZ4NMDwYtN18obc8AemS3
  */
 namespace cryptonote
 {
+enum class TransferType { Transfer };
+
+    struct article_result {
+    bool success;
+    std::vector<std::string> tx_hashes;
+    std::string error;
+    article_metadata metadata;
+    };
+
   /*!
    * \brief Manages wallet operations. This is the most abstracted wallet class.
    */
@@ -160,7 +169,13 @@ namespace cryptonote
     bool transfer(const std::vector<std::string> &args);
     bool show_article(const std::vector<std::string>& args);
     bool article_long(int transfer_type, const std::vector<std::string>& args_, bool called_by_mms);
-    bool article_main(int transfer_type, const std::vector<std::string> &args_, bool called_by_mms);
+    cryptonote::article_result article_main(
+    int type,
+    const std::vector<std::string>& args,
+    bool called_by_mms,
+    const boost::optional<calculator_metadata>& calc,
+    const boost::optional<ballot_metadata>& ballot
+    );
     bool add_article_long(const std::vector<std::string> &args_);
     bool add_article(const std::vector<std::string> &args);
     bool locked_transfer(const std::vector<std::string> &args);
@@ -253,7 +268,6 @@ namespace cryptonote
     bool blackballed(const std::vector<std::string>& args);
     bool version(const std::vector<std::string>& args);
     bool cold_sign_tx(const std::vector<tools::wallet2::pending_tx>& ptx_vector, tools::wallet2::signed_tx_set &exported_txs, std::vector<cryptonote::address_parse_info> &dsts_info, std::function<bool(const tools::wallet2::signed_tx_set &)> accept_func);
-
     bool register_full_node_main(
         const std::vector<std::string>& full_node_key_as_str,
         const cryptonote::account_public_address& address,

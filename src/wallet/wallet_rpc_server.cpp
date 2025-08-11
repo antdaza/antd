@@ -53,6 +53,8 @@ using namespace epee;
 #include "rpc/rpc_args.h"
 #include "rpc/core_rpc_server_commands_defs.h"
 #include "daemonizer/daemonizer.h"
+#include "cryptonote_basic/metadata_type.h"
+#include "simplewallet/simplewallet.h"
 
 #undef ANTD_DEFAULT_LOG_CATEGORY
 #define ANTD_DEFAULT_LOG_CATEGORY "wallet.rpc"
@@ -711,6 +713,66 @@ namespace tools
       }
 
     }
+    return true;
+  }
+  //-----------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_add_article(
+    const wallet_rpc::COMMAND_RPC_ADD_ARTICLE::request& req,
+    wallet_rpc::COMMAND_RPC_ADD_ARTICLE::response& res,
+    epee::json_rpc::error& er,
+    const connection_context *ctx)
+{
+    if (!m_wallet)
+        return not_open(er);
+
+    if (m_restricted) {
+        er.code = WALLET_RPC_ERROR_CODE_DENIED;
+        er.message = tr("Command unavailable in restricted mode.");
+        return false;
+    }
+
+    if (req.title.empty() || req.content.empty()) {
+        er.code = WALLET_RPC_ERROR_CODE_BAD_TX_METADATA;
+        er.message = tr("Missing title or content");
+        return false;
+    }
+
+    if (req.title.size() > 128 || req.content.size() > 2048 || req.publisher.size() > 64) {
+        er.code = WALLET_RPC_ERROR_CODE_BAD_TX_METADATA;
+        er.message = tr("Article metadata too long (title <= 128, content <= 2048, publisher <= 64)");
+        return false;
+    }
+
+    std::vector<std::string> args;
+    std::string combined = req.title + ":" + req.content + ":" + (req.publisher.empty() ? "Unknown" : req.publisher);
+    args.push_back(combined);
+    args.push_back(req.address);
+    args.push_back(std::to_string(req.amount));
+
+    try {
+        cryptonote::article_result result =
+            m_wallet->article_main(static_cast<int>(cryptonote::TransferType::Transfer),
+                                   args,
+                                   false,
+                                   req.calc,
+                                   req.ballot);
+
+        res.success   = result.success;
+        res.tx_hashes = result.tx_hashes;
+        res.error     = result.error;
+        res.metadata  = result.metadata;
+
+        if (!result.success) {
+            er.code = WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR;
+            er.message = result.error;
+            return false;
+        }
+    }
+    catch (const std::exception& e) {
+        handle_rpc_exception(std::current_exception(), er, WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR);
+        return false;
+    }
+
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------

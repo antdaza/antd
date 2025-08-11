@@ -158,6 +158,7 @@ namespace tools
         MAP_JON_RPC_WE("register_full_node", on_register_full_node, wallet_rpc::COMMAND_RPC_REGISTER_FULL_NODE)
         MAP_JON_RPC_WE("can_request_stake_unlock", on_can_request_stake_unlock, wallet_rpc::COMMAND_RPC_CAN_REQUEST_STAKE_UNLOCK)
         MAP_JON_RPC_WE("request_stake_unlock", on_request_stake_unlock, wallet_rpc::COMMAND_RPC_REQUEST_STAKE_UNLOCK)
+        MAP_JON_RPC_WE("add_article", on_add_article, wallet_rpc::COMMAND_RPC_ADD_ARTICLE)
       END_JSON_RPC_MAP()
     END_URI_MAP2()
 
@@ -242,7 +243,10 @@ namespace tools
       bool on_register_full_node(const wallet_rpc::COMMAND_RPC_REGISTER_FULL_NODE::request& req, wallet_rpc::COMMAND_RPC_REGISTER_FULL_NODE::response& res, epee::json_rpc::error& er, const connection_context *ctx = NULL);
       bool on_can_request_stake_unlock(const wallet_rpc::COMMAND_RPC_CAN_REQUEST_STAKE_UNLOCK::request& req, wallet_rpc::COMMAND_RPC_CAN_REQUEST_STAKE_UNLOCK::response& res, epee::json_rpc::error& er, const connection_context *ctx = NULL);
       bool on_request_stake_unlock(const wallet_rpc::COMMAND_RPC_REQUEST_STAKE_UNLOCK::request& req, wallet_rpc::COMMAND_RPC_REQUEST_STAKE_UNLOCK::response& res, epee::json_rpc::error& er, const connection_context *ctx = NULL);
-
+      bool on_add_article(const wallet_rpc::COMMAND_RPC_ADD_ARTICLE::request& req,
+                                      wallet_rpc::COMMAND_RPC_ADD_ARTICLE::response& res,
+                                      epee::json_rpc::error& er,
+                                      const connection_context *ctx = NULL);
       //json rpc v2
       bool on_query_key(const wallet_rpc::COMMAND_RPC_QUERY_KEY::request& req, wallet_rpc::COMMAND_RPC_QUERY_KEY::response& res, epee::json_rpc::error& er, const connection_context *ctx = NULL);
 

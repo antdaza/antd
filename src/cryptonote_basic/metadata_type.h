@@ -47,4 +47,3 @@ struct article_metadata {
   template <class Archive>
   bool serialize(Archive& ar);
 };
-
