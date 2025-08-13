@@ -44,7 +44,7 @@ cmake_minimum_required(VERSION 3.0.0)
 message(STATUS "CMake version ${CMAKE_VERSION}")
 
 set(ANTD_VERSION_MAJOR 7)
-set(ANTD_VERSION_MINOR 0)
+set(ANTD_VERSION_MINOR 1)
 set(ANTD_VERSION_PATCH 1)
 set(ANTD_VERSION_TAG "release")
 
