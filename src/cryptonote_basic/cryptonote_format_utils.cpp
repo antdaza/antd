@@ -1,6 +1,6 @@
 // Copyright (c) 2014-2025, The Monero Project
 // Copyright (c)      2018-2024, The Oxen Project
-// 
+// Copyright (c)      2025, The AntD Project 
 // All rights reserved.
 // 
 // Redistribution and use in source and binary forms, with or without modification, are
