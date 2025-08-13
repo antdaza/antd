@@ -53,7 +53,7 @@ using namespace epee;
 #include "rpc/rpc_args.h"
 #include "rpc/core_rpc_server_commands_defs.h"
 #include "daemonizer/daemonizer.h"
-
+#include "cryptonote_basic/article_metadata.h"
 #undef ANTD_DEFAULT_LOG_CATEGORY
 #define ANTD_DEFAULT_LOG_CATEGORY "wallet.rpc"
 
@@ -451,6 +451,84 @@ namespace tools
     }
     return true;
   }
+  //--------------------------------------------------------------------------------------------------------------------------------
+bool wallet_rpc_server::on_add_article(const wallet_rpc::COMMAND_RPC_ADD_ARTICLE::request& req, wallet_rpc::COMMAND_RPC_ADD_ARTICLE::response& res, epee::json_rpc::error& er, const connection_context* ctx) {
+  LOG_PRINT_L3("on_add_article starts");
+  if (!m_wallet) return not_open(er);
+  if (m_restricted) {
+    er.code = WALLET_RPC_ERROR_CODE_DENIED;
+    er.message = "Command unavailable in restricted mode.";
+    return false;
+  }
+
+  // Validate address
+  cryptonote::address_parse_info addr_info;
+  if (!cryptonote::get_account_address_from_str(addr_info, m_wallet->nettype(), req.address)) {
+    er.code = WALLET_RPC_ERROR_CODE_INVALID_ADDRESS;
+    er.message = "Invalid address";
+    return false;
+  }
+
+  // Prepare transaction destinations
+  std::vector<cryptonote::tx_destination_entry> dsts;
+  cryptonote::tx_destination_entry de;
+  de.amount = req.amount; // Amount in piconero
+  de.addr = addr_info.address;
+  dsts.push_back(de);
+
+  // Add article metadata to tx_extra using provided snippet
+  std::vector<uint8_t> extra;
+  // message_writer() << tr("Debug: Before calling set_article_to_tx_extra");
+  cryptonote::article_metadata article_meta = cryptonote::set_article_to_tx_extra(req.title, req.content, req.publisher);
+  if (!article_meta.success) {
+    er.code = WALLET_RPC_ERROR_CODE_INVALID_INPUT;
+    er.message = "Failed to process article: " + article_meta.error;
+    // fail_msg_writer() << tr("Failed to process article: ") << article_meta.error;
+    return false;
+  }
+
+  // message_writer() << tr("Debug: Adding article metadata to tx_extra");
+  cryptonote::blobdata extra_nonce(article_meta.serialized_blob.begin(), article_meta.serialized_blob.end());
+  if (!cryptonote::add_extra_nonce_to_tx_extra(extra, extra_nonce)) {
+    er.code = WALLET_RPC_ERROR_CODE_INVALID_INPUT;
+    er.message = "Failed to add article metadata to tx_extra";
+    // fail_msg_writer() << tr("Failed to add article metadata to tx_extra");
+    return false;
+  }
+
+  try {
+    // Use default or adjusted mixin (ring size - 1)
+    uint64_t mixin = m_wallet->adjust_mixin(0); // Default mixin
+    uint32_t priority = m_wallet->adjust_priority(0); // Default priority
+    std::vector<wallet2::pending_tx> ptx_vector = m_wallet->create_transactions_2(dsts, mixin, 0 /* unlock_time */, priority, extra, 0 /* account_index */, {} /* subaddr_indices */);
+
+    if (ptx_vector.empty()) {
+      er.code = WALLET_RPC_ERROR_CODE_TX_NOT_POSSIBLE;
+      er.message = "No transaction created";
+      return false;
+    }
+
+    if (ptx_vector.size() != 1) {
+      er.code = WALLET_RPC_ERROR_CODE_TX_TOO_LARGE;
+      er.message = "Transaction would be too large. Try splitting.";
+      return false;
+    }
+
+    // Fill response
+    res.tx_hash = epee::string_tools::pod_to_hex(cryptonote::get_transaction_hash(ptx_vector[0].tx));
+    res.content_hash = epee::string_tools::pod_to_hex(article_meta.content_hash);
+    res.error = "";
+
+    // Commit transaction (relay to network)
+    m_wallet->commit_tx(ptx_vector[0]);
+
+    return true;
+  } catch (const std::exception& e) {
+    handle_rpc_exception(std::current_exception(), er, WALLET_RPC_ERROR_CODE_GENERIC_TRANSFER_ERROR);
+    return false;
+  }
+  return true;
+}
   //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::on_label_address(const wallet_rpc::COMMAND_RPC_LABEL_ADDRESS::request& req, wallet_rpc::COMMAND_RPC_LABEL_ADDRESS::response& res, epee::json_rpc::error& er, const connection_context *ctx)
   {

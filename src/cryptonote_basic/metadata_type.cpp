@@ -3,7 +3,7 @@
 #include <sstream>
 
 template <class Archive>
-bool article_metadata::serialize(Archive& ar)
+bool cryptonote::article_metadata::serialize(Archive& ar)
 {
   ar.begin_object();
   
@@ -124,4 +124,4 @@ bool article_metadata::serialize(Archive& ar)
 }
 
 // Explicit template instantiation
-template bool article_metadata::serialize<json_archive<true>>(json_archive<true>&);
+template bool cryptonote::article_metadata::serialize<json_archive<true>>(json_archive<true>&);

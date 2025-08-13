@@ -5,6 +5,8 @@
 #include "crypto/crypto.h"
 #include "serialization/json_archive.h"
 
+namespace cryptonote {
+
 enum class metadata_type_t : uint8_t {
   ARTICLE = 0x01,
   CALCULATOR = 0x02,
@@ -48,3 +50,4 @@ struct article_metadata {
   bool serialize(Archive& ar);
 };
 
+}

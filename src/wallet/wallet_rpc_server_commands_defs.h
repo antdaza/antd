@@ -2362,5 +2362,61 @@ namespace wallet_rpc
     // typedef epee::misc_utils::struct_init<response_t> response;
   };
 
+struct COMMAND_RPC_ADD_ARTICLE
+{
+  struct request
+  {
+    std::string title;
+    std::string content;
+    std::string publisher;
+    std::string address;
+    uint64_t amount;
+    uint64_t unlock_time;
+    uint32_t priority;
+    bool get_tx_key;
+    bool do_not_relay;
+    bool get_tx_hex;
+    bool get_tx_metadata;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(title)
+      KV_SERIALIZE(content)
+      KV_SERIALIZE(publisher)
+      KV_SERIALIZE(address)
+      KV_SERIALIZE(amount)
+      KV_SERIALIZE(unlock_time)
+      KV_SERIALIZE(priority)
+      KV_SERIALIZE(get_tx_key)
+      KV_SERIALIZE(do_not_relay)
+      KV_SERIALIZE(get_tx_hex)
+      KV_SERIALIZE(get_tx_metadata)
+    END_KV_SERIALIZE_MAP()
+  };
+
+  struct response
+  {
+    std::string tx_hash;
+    std::string tx_key;
+    uint64_t amount;
+    uint64_t fee;
+    std::string error;
+    std::string tx_blob;
+    std::string content_hash;
+    std::string tx_metadata;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(tx_hash)
+      KV_SERIALIZE(tx_key)
+      KV_SERIALIZE(amount)
+      KV_SERIALIZE(fee)
+      KV_SERIALIZE(content_hash)
+      KV_SERIALIZE(error)
+      KV_SERIALIZE(tx_blob)
+      KV_SERIALIZE(tx_metadata)
+    END_KV_SERIALIZE_MAP()
+  };
+};
+
+
 }
 }

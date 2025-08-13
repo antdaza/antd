@@ -61,6 +61,7 @@ constexpr const char MONERO_DONATION_ADDR[] = "44AFFq5kSiGBoZ4NMDwYtN18obc8AemS3
  */
 namespace cryptonote
 {
+    article_metadata set_article_to_tx_extra(const std::string& title, const std::string& content, const std::string& publisher);
   /*!
    * \brief Manages wallet operations. This is the most abstracted wallet class.
    */
@@ -83,6 +84,7 @@ namespace cryptonote
     bool process_command(const std::vector<std::string> &args);
     std::string get_commands_str();
     std::string get_command_usage(const std::vector<std::string> &args);
+   // article_metadata set_article_to_tx_extra(const std::string& title, const std::string& content, const std::string& publisher);
   private:
 
     enum ResetType { ResetNone, ResetSoft, ResetHard };

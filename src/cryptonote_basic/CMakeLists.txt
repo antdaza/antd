@@ -44,6 +44,7 @@ set(cryptonote_basic_sources
   difficulty.cpp
   hardfork.cpp
 metadata_type.cpp
+  article_metadata.cpp
   miner.cpp)
 
 set(cryptonote_basic_headers)
@@ -55,6 +56,7 @@ set(cryptonote_basic_private_headers
   cryptonote_basic.h
   cryptonote_basic_impl.h
   metadata_type.h
+  article_metadata.h
   cryptonote_boost_serialization.h
   cryptonote_format_utils.h
   cryptonote_stat_info.h

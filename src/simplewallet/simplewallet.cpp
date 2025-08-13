@@ -5720,7 +5720,7 @@ bool simple_wallet::locked_transfer(const std::vector<std::string> &args_)
 }
 //-------------------------------------------------------
 
-article_metadata set_article_to_tx_extra(const std::string& title, const std::string& content, const std::string& publisher) {
+article_metadata cryptonote::set_article_to_tx_extra(const std::string& title, const std::string& content, const std::string& publisher) {
   article_metadata result;
   message_writer() << tr("Debug: set_article_to_tx_extra: Starting");
 
