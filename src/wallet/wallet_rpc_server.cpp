@@ -235,6 +235,10 @@ namespace tools
       assert(bool(http_login));
     } // end auth enabled
 
+   m_article_tracker = std::make_unique<cryptonote::ArticleOwnershipTracker>("article_ownership.db", m_wallet->nettype());
+   if (!m_article_tracker->init()) {
+    LOG_ERROR("Failed to initialize ArticleOwnershipTracker");
+   }
     m_net_server.set_threads_prefix("RPC");
     auto rng = [](size_t len, uint8_t *ptr) { return crypto::rand(len, ptr); };
     return epee::http_server_impl_base<wallet_rpc_server, connection_context>::init(
@@ -452,6 +456,77 @@ namespace tools
     }
     return true;
   }
+  //--------------------------------------------------------------------------------------------------------------
+bool wallet_rpc_server::on_transfer_article(
+    const wallet_rpc::COMMAND_RPC_TRANSFER_ARTICLE::request& req,
+    wallet_rpc::COMMAND_RPC_TRANSFER_ARTICLE::response& res,
+    epee::json_rpc::error& er,
+    const connection_context* ctx)
+{
+    if (!m_wallet) return not_open(er);
+    if (m_restricted) {
+        er.code = WALLET_RPC_ERROR_CODE_DENIED;
+        er.message = "Command unavailable in restricted mode.";
+        return false;
+    }
+
+    if (!m_article_tracker) {
+        er.code = WALLET_RPC_ERROR_CODE_GENERIC_TRANSFER_ERROR;
+        er.message = "Article tracker not initialized";
+        return false;
+    }
+
+    // Get current owner
+    std::string current_owner = m_article_tracker->get_owner(req.article_tx_hash);
+    if (current_owner.empty()) {
+        er.code = WALLET_RPC_ERROR_CODE_NOT_FOUND;
+        er.message = "Article not found";
+        return false;
+    }
+
+    // Validate new owner address
+    cryptonote::address_parse_info addr_info;
+    if (!cryptonote::get_account_address_from_str(addr_info, m_wallet->nettype(), req.new_owner_address)) {
+        er.code = WALLET_RPC_ERROR_CODE_INVALID_ADDRESS;
+        er.message = "Invalid new owner address";
+        return false;
+    }
+
+    // Prepare transaction to pay new owner (if amount > 0)
+    if (req.amount > 0) {
+        std::vector<cryptonote::tx_destination_entry> dsts;
+        cryptonote::tx_destination_entry de;
+        de.amount = req.amount;
+        de.addr = addr_info.address;
+        dsts.push_back(de);
+
+        std::vector<uint8_t> extra;
+        uint64_t mixin = m_wallet->adjust_mixin(0);
+        uint32_t priority = m_wallet->adjust_priority(0);
+
+        std::vector<wallet2::pending_tx> ptx_vector =
+            m_wallet->create_transactions_2(dsts, mixin, 0, priority, extra, 0, {});
+
+        if (ptx_vector.empty()) {
+            er.code = WALLET_RPC_ERROR_CODE_TX_NOT_POSSIBLE;
+            er.message = "Transaction not possible";
+            return false;
+        }
+
+        m_wallet->commit_tx(ptx_vector[0]);
+        res.payment_tx_hash = epee::string_tools::pod_to_hex(cryptonote::get_transaction_hash(ptx_vector[0].tx));
+    }
+
+    // Update database ownership
+    if (!m_article_tracker->update_ownership(req.article_tx_hash, req.new_owner_address)) {
+        er.code = WALLET_RPC_ERROR_CODE_GENERIC_TRANSFER_ERROR;
+        er.message = "Failed to update ownership in database";
+        return false;
+    }
+
+    res.status = "Ownership transferred";
+    return true;
+   }
   //--------------------------------------------------------------------------------------------------------------------------------
 bool wallet_rpc_server::on_add_article(const wallet_rpc::COMMAND_RPC_ADD_ARTICLE::request& req, wallet_rpc::COMMAND_RPC_ADD_ARTICLE::response& res, epee::json_rpc::error& er, const connection_context* ctx) {
   LOG_PRINT_L3("on_add_article starts");
@@ -522,12 +597,15 @@ bool wallet_rpc_server::on_add_article(const wallet_rpc::COMMAND_RPC_ADD_ARTICLE
 
     // Commit transaction (relay to network)
     m_wallet->commit_tx(ptx_vector[0]);
-
+   if (m_article_tracker) {
+    m_article_tracker->update_ownership(res.tx_hash, req.address);
+   }
     return true;
   } catch (const std::exception& e) {
     handle_rpc_exception(std::current_exception(), er, WALLET_RPC_ERROR_CODE_GENERIC_TRANSFER_ERROR);
     return false;
   }
+
   return true;
 }
   //------------------------------------------------------------------------------------------------------------------------------

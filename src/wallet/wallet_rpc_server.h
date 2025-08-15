@@ -40,6 +40,7 @@
 #include "math_helper.h"
 #include "wallet_rpc_server_commands_defs.h"
 #include "wallet2.h"
+#include "article_ownership.h"
 
 #undef ANTD_DEFAULT_LOG_CATEGORY
 #define ANTD_DEFAULT_LOG_CATEGORY "wallet.rpc"
@@ -160,10 +161,16 @@ namespace tools
         MAP_JON_RPC_WE("can_request_stake_unlock", on_can_request_stake_unlock, wallet_rpc::COMMAND_RPC_CAN_REQUEST_STAKE_UNLOCK)
         MAP_JON_RPC_WE("request_stake_unlock", on_request_stake_unlock, wallet_rpc::COMMAND_RPC_REQUEST_STAKE_UNLOCK)
         MAP_JON_RPC_WE("add_article", on_add_article, wallet_rpc::COMMAND_RPC_ADD_ARTICLE)
+        MAP_JON_RPC_WE("transfer_article", on_transfer_article, wallet_rpc::COMMAND_RPC_TRANSFER_ARTICLE)
       END_JSON_RPC_MAP()
     END_URI_MAP2()
 
       //json_rpc
+      bool on_transfer_article(
+      const wallet_rpc::COMMAND_RPC_TRANSFER_ARTICLE::request& req,
+      wallet_rpc::COMMAND_RPC_TRANSFER_ARTICLE::response& res,
+      epee::json_rpc::error& er,
+      const connection_context *ctx = NULL);
       bool on_add_article(const wallet_rpc::COMMAND_RPC_ADD_ARTICLE::request& req,
                                        wallet_rpc::COMMAND_RPC_ADD_ARTICLE::response& res,
                                        epee::json_rpc::error& er,
@@ -273,5 +280,6 @@ namespace tools
       std::atomic<bool> m_stop;
       bool m_restricted;
       const boost::program_options::variables_map *m_vm;
+      std::unique_ptr<cryptonote::ArticleOwnershipTracker> m_article_tracker;
   };
 }

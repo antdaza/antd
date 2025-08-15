@@ -38,6 +38,7 @@ set(wallet_sources
   node_rpc_proxy.cpp
   message_store.cpp
   message_transporter.cpp
+  article_ownership.cpp
 )
 
 set(wallet_private_headers
@@ -50,7 +51,8 @@ set(wallet_private_headers
   ringdb.h
   node_rpc_proxy.h
   message_store.h
-  message_transporter.h)
+  message_transporter.h
+  article_ownership.h)
 
 antd_private_headers(wallet
   ${wallet_private_headers})
@@ -64,6 +66,7 @@ target_link_libraries(wallet
     cryptonote_core
     mnemonics
     device_trezor
+    sqlite
     ${LMDB_LIBRARY}
     ${Boost_CHRONO_LIBRARY}
     ${Boost_SERIALIZATION_LIBRARY}

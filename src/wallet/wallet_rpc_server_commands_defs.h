@@ -2417,6 +2417,28 @@ struct COMMAND_RPC_ADD_ARTICLE
   };
 };
 
+struct COMMAND_RPC_TRANSFER_ARTICLE {
+    struct request {
+        std::string article_tx_hash;
+        std::string new_owner_address;
+        uint64_t amount; // picoantd
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(article_tx_hash)
+      KV_SERIALIZE(new_owner_address)
+    END_KV_SERIALIZE_MAP()
+    };
+
+    struct response {
+        std::string status;
+        std::string payment_tx_hash; // optional if amount > 0
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(status)
+      KV_SERIALIZE(payment_tx_hash)
+    END_KV_SERIALIZE_MAP()
+    };
+};
 
 }
 }
