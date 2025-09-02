@@ -131,7 +131,6 @@ public:
   virtual bool for_all_outputs(std::function<bool(uint64_t amount, const crypto::hash &tx_hash, uint64_t height, size_t tx_idx)> f) const override { return true; }
   virtual bool for_all_outputs(uint64_t amount, const std::function<bool(uint64_t height)> &f) const override { return true; }
 
-<<<<<<< HEAD
   virtual void set_hard_fork_version(uint64_t height, uint8_t version) override {}
   virtual uint8_t get_hard_fork_version(uint64_t height) const override { return 0; }
   virtual void check_hard_fork_info() override {}
